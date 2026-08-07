@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Collected data — real business leads and phone numbers, never publish
+hostel-hunter/data/
+*.db
+*.db-wal
+*.db-shm
+
+# Generated Excel/CSV files
+hostel-hunter/exports/
+*.xlsx
+*.csv
+
+# ...except the committed example output
+!samples/
+!samples/*.xlsx
+
+# Local settings (copy .env.example to .env)
+.env
+
+# Logs and OS noise
+*.log
+npm-debug.log*
+Thumbs.db
+desktop.ini
+.DS_Store

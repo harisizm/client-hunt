@@ -1,0 +1,14 @@
+{
+  "name": "hostel-hunter",
+  "version": "1.0.0",
+  "description": "Web 7 Labs Marketing Team - Google Maps hostel lead finder",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "playwright": "^1.56.0"
+  }
+}

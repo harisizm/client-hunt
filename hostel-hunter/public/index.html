@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Web 7 Labs — Hostel Hunter</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="captchaBanner" class="captcha-banner hidden">
+  <span>⚠ Google wants a quick human check. Click the red button — a window opens, tick the box in it, and everything continues on its own.</span>
+  <button id="btnSolve" class="btn btn-danger">Fix it now</button>
+</div>
+
+<div class="shell">
+  <header>
+    <div class="brand">
+      <h1>Web 7 Labs <span class="sep">·</span> <span class="grad">Marketing Team</span></h1>
+      <p class="tagline">Hostel Hunter — finds hostels on Google Maps for you</p>
+    </div>
+    <div class="head-right">
+      <div class="master-info" id="masterInfo"></div>
+      <div class="head-note">works by itself · nothing gets lost · saved on this computer</div>
+    </div>
+  </header>
+
+  <div class="steps">
+    <span><b>1</b> Type the area</span>
+    <span class="arrow">→</span>
+    <span><b>2</b> Click <i>Find places</i> and wait — it does everything alone</span>
+    <span class="arrow">→</span>
+    <span><b>3</b> When it says <i>finished</i>, click <i>Download Excel</i></span>
+  </div>
+
+  <main>
+    <!-- New search -->
+    <section class="card area-form">
+      <h2><span class="dot"></span>New search</h2>
+      <form id="huntForm">
+        <label>What to look for <input name="keyword" value="hostels" required></label>
+        <label>City <input name="city" placeholder="Lahore"></label>
+        <div class="row2">
+          <label>Area <input name="area" placeholder="Gulberg"></label>
+          <label>Sub-area <input name="subarea" placeholder="C Block"></label>
+        </div>
+        <details class="advanced">
+          <summary>More options (you can ignore this)</summary>
+          <div class="row2">
+            <label>How many places to collect
+              <select name="maxResults">
+                <option value="0" selected>All of them (recommended)</option>
+                <option value="25">25 at a time, then stop</option>
+                <option value="50">50 at a time, then stop</option>
+                <option value="100">100 at a time, then stop</option>
+              </select>
+            </label>
+            <label>Speed
+              <select name="batchSize">
+                <option value="5">Extra careful — rests often</option>
+                <option value="10" selected>Normal (recommended)</option>
+                <option value="20">Faster — rests less</option>
+              </select>
+            </label>
+          </div>
+          <p class="hint">The normal settings work great — no need to change anything. If a search stops early, everything already collected stays saved and you can continue anytime.</p>
+        </details>
+        <label>How many do you expect to find? <input name="target" type="number" min="0" value="0" placeholder="0 = as many as possible"></label>
+        <label class="check deep-check"><input type="checkbox" name="deep" checked> Look extra deep — keeps trying different searches until nothing new comes up</label>
+        <button type="submit" class="btn btn-primary btn-wide" id="btnStart">🔍 Find places</button>
+        <p class="hint" style="margin-top:8px">Phone numbers and addresses are collected automatically. If something is already running, this one waits its turn.</p>
+      </form>
+    </section>
+
+    <!-- Progress -->
+    <section class="card area-active">
+      <h2><span class="dot"></span>Progress <span id="queueBadge" class="queue-badge hidden"></span></h2>
+      <div id="activePanel">
+        <p class="muted">Nothing running. Fill the form on the left and click <b>Find places</b>.</p>
+      </div>
+    </section>
+
+    <!-- What's happening -->
+    <section class="card area-log">
+      <h2><span class="dot"></span>What is happening <button id="btnClearLog" class="btn btn-ghost btn-sm">clear</button></h2>
+      <div id="logPanel" class="log-panel"></div>
+    </section>
+
+    <!-- Searches + download -->
+    <section class="card area-bottom">
+      <div class="bottom-grid">
+        <div class="bottom-left">
+          <h2><span class="dot"></span>Your searches</h2>
+          <p class="hint" style="margin-bottom:10px">Tick searches below (the top checkbox selects all), then use these buttons — or tick nothing and just press Download Excel for everything.</p>
+          <div class="bulk-bar">
+            <span id="bulkSelected" class="bulk-selected">
+              <button id="btnDownloadSel" class="btn btn-primary">⬇ Download selected</button>
+              <button id="btnResumeSel" class="btn">▶ Continue collecting</button>
+              <button id="btnDeleteSel" class="btn btn-danger">🗑 Delete selected</button>
+            </span>
+            <span class="bulk-sep"></span>
+            <button id="btnDownloadAll" class="btn btn-primary">⬇ Download everything</button>
+          </div>
+          <div class="table-wrap">
+            <table id="huntsTable">
+              <thead>
+                <tr><th><input type="checkbox" id="pickAll" title="select all"></th><th>#</th><th>Search</th><th>Status</th><th>Found</th><th>Saved</th><th>Took</th><th>Date</th><th></th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="bottom-right">
+          <h2><span class="dot"></span>Download Excel file</h2>
+          <div class="filters">
+            <label>File type
+              <select id="fFormat"><option value="xlsx">Excel (.xlsx)</option><option value="csv">CSV</option></select>
+            </label>
+            <label>Boys / girls
+              <select id="fGender"><option value="">everything</option><option value="girls">girls only</option><option value="boys">boys only</option></select>
+            </label>
+            <label>Area
+              <select id="fArea"><option value="">all areas</option></select>
+            </label>
+            <label>Sub-area
+              <select id="fSubarea"><option value="">all sub-areas</option></select>
+            </label>
+            <label>Rating at least <input id="fMinRating" type="number" step="0.1" min="0" max="5" placeholder="any"></label>
+            <label>Reviews at least <input id="fMinReviews" type="number" min="0" placeholder="any"></label>
+            <label>Type contains <input id="fCatInc" placeholder="hostel"></label>
+            <label>Type is NOT <input id="fCatExc" placeholder="hotel, guest house"></label>
+            <label>Collected from <input id="fDateFrom" type="date"></label>
+            <label>Collected until <input id="fDateTo" type="date"></label>
+            <label class="check"><input id="fHasPhone" type="checkbox"> only with phone number</label>
+            <label class="check"><input id="fNoDups" type="checkbox"> hide repeated ones</label>
+          </div>
+          <div class="export-actions">
+            <button id="btnExport" class="btn btn-primary">⬇ Download Excel</button>
+            <span id="exportResult"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="modalOverlay" class="modal-overlay hidden">
+  <div class="modal">
+    <p id="modalText"></p>
+    <div class="modal-actions">
+      <button id="modalCancel" class="btn">Cancel</button>
+      <button id="modalOk" class="btn btn-primary">OK</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
