@@ -17,8 +17,10 @@ business type in any city.
 
 1. You type what to look for and where — *hostels · Lahore · Gulberg · C Block*.
 2. It scrolls Google's whole result list, then keeps re-searching the area from
-   different angles (wording variants and rings of nearby map positions) until
-   nothing new turns up. A single search often triples what one Google query shows.
+   different angles (wording variants and ever-widening rings of nearby map
+   positions) for as long as new places keep appearing — it stops only after
+   several searches in a row find nothing new. A single search often triples
+   what one Google query shows.
 3. It opens every place and saves the details to a local database, live — a crash,
    a stop, or a power cut loses nothing.
 4. You click **Download Excel** and get one sheet per area, ready to work from.
@@ -44,7 +46,7 @@ Full column list: City · Area · Sub Area · Name · Phone · Email · Address 
 Website · Rating · Reviews · Category · Duplicate? · Duplicate Reason ·
 Google Maps Link · Fetched At.
 
-Files are named `hostels_johar-town_2026-08-07_1830.xlsx` and land in
+Files are named `hostels_johar-town_2026-08-07_6-30-15PM.xlsx` and land in
 `hostel-hunter/exports/` as well as your browser's Downloads folder. CSV is a
 dropdown away.
 
@@ -60,7 +62,7 @@ one-click export along the bottom.
 │  hostels         │  ● getting details…     │  Results list found…         │
 │  Lahore          │                         │  +12 new places (164 total)  │
 │  Johar Town      │      164 of 164         │  ✓ Lahore Hostel | 0313…     │
-│  ☑ look deep     │  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ 100%   │  ✓ Boys Hostel   | 0317…     │
+│  Expect ~150     │  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ 100%   │  ✓ Boys Hostel   | 0317…     │
 │  [ Find places ] │  Started 5:41 PM ·      │  short 5s rest…              │
 │                  │  Working time 2 min     │  Hunt complete: 164 saved    │
 ├──────────────────┴─────────────────────────┴──────────────────────────────┤
@@ -74,12 +76,15 @@ one-click export along the bottom.
 
 - **One click** — discovery and detail collection run start to finish on their own
 - **Queue** — start several areas; they run one at a time, safely
-- **Never loses data** — everything saves as it is collected; pause and continue anytime
+- **Never loses data** — everything saves as it is collected; pause, close the
+  window or lose power anytime, and Resume continues from the exact point —
+  even in the middle of a deep search
 - **Instant re-runs** — places already collected are recognised and copied from the
   database instead of being fetched again
 - **Duplicate marking** — repeats are flagged, never deleted, and you choose at export
 - **Export filters** — area, sub-area, rating, reviews, phone-only, boys/girls, dates
-- **Plain-language interface** — built for non-technical users, with live progress and colour-coded activity log
+- **Plain-language interface** — built for non-technical users, with live progress,
+  a colour-coded activity log, and hover explanations on every option and status
 - **Handles Google's human check** — pauses, alerts, one click to clear, then carries on
 
 ## Install (Windows)
@@ -93,7 +98,9 @@ Full step-by-step instructions, including a fresh-laptop checklist and
 troubleshooting, are in **[SETUP.md](SETUP.md)**.
 The day-to-day user guide is in **[hostel-hunter/README.md](hostel-hunter/README.md)**.
 
-To stop it: close the black window, or double-click `Stop Hostel Finder.bat`.
+To stop it: just close the black window. The app shuts down cleanly — data,
+browser and port are all released, and a half-finished search resumes from the
+exact same point next time.
 
 ## Configuration
 

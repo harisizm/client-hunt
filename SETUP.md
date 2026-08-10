@@ -11,7 +11,7 @@ Total time: ~10 minutes, most of it downloads.
 A small local web app. It runs entirely on the laptop:
 
 - **Node.js** — the only thing you install system-wide
-- **This folder** — the app itself (`hostel-hunter/` + the two `.bat` files)
+- **This folder** — the app itself (`hostel-hunter/` + `Start Hostel Finder.bat`)
 - No accounts, no API keys, no Google login, nothing paid
 
 ---
@@ -102,8 +102,11 @@ If all four happen, the install is good.
   thing the team ever touches.
 - Tell them the 3 steps written on the page itself:
   **type the area → Find places → Download Excel.**
-- Closing the black window stops the app (nothing is lost — data is saved
-  live). Starting it again = double-click the shortcut.
+- Closing the black window is how you stop the app — it shuts down cleanly
+  (nothing is lost, data is saved live, the port is freed). A search that was
+  half-way shows as **paused** on the next start; pressing **Resume** continues
+  it from the exact point it stopped, deep search included. Starting the app
+  again = double-click the shortcut.
 
 ---
 

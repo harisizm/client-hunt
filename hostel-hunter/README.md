@@ -16,7 +16,9 @@ website, rating and more to Excel/CSV — automatically, in bulk, for free.
 5. When done, click **Export this hunt** (or tick hunts in the table), set any filters
    (min rating, only-with-phone, girls/boys, exclude duplicates, dates…)
    and click **Export** → download the Excel file. One sheet per area,
-   named like `hostels_gulberg-c-block_2026-08-07_1530.xlsx`.
+   named like `hostels_gulberg-c-block_2026-08-07_3-30-15PM.xlsx`.
+6. Finished for the day? Just **close the black window** — the app stops
+   cleanly and everything stays saved.
 
 ## If a red banner appears ("verification")
 
@@ -29,11 +31,13 @@ a few minutes.
 
 - Runs 100% on this computer. **No Google login, no API key, no cost.**
 - Your mouse and screen stay free — the browser it drives is invisible.
-- Duplicates are **flagged, never deleted** — including numbers already in
-  the app's master list. Use the export filter to hide them.
+- Duplicates are **flagged, never deleted** — the note tells you exactly which
+  place it matches (name and area). Use the export filter to hide them.
+- The deep search has no fixed limit: it keeps trying new searches for as long
+  as new places appear, and stops only after several in a row find nothing new.
 - Small batches + human-like pauses keep Google happy. If a hunt is
-  interrupted (crash, power cut), just press **Resume** — it continues
-  exactly where it stopped.
+  interrupted (window closed, crash, power cut), just press **Resume** — it
+  continues exactly where it stopped, even in the middle of a deep search.
 - All data lives in `hostel-hunter/data/hunter.db`; exports in
   `hostel-hunter/exports/`.
 
