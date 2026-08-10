@@ -63,7 +63,10 @@ async function buildExport({ huntIds, format = 'xlsx', filters = {} }) {
       ? slug([hunts[0].subarea, hunts[0].area, hunts[0].city].filter(Boolean).join(' ')) || 'all'
       : `${hunts.length}-areas`;
   const now = new Date();
-  const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+  // 12-hour clock in the name, the way the team reads time: …_6-30-45PM
+  const h12 = now.getHours() % 12 || 12;
+  const ap = now.getHours() >= 12 ? 'PM' : 'AM';
+  const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${h12}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}${ap}`;
   const base = `${keyword}_${areaPart}_${stamp}`;
 
   if (format === 'csv') {

@@ -116,84 +116,115 @@ class HuntEngine {
     const hunt = store.getHunt(huntId);
     this.activeHuntId = huntId;
     this.stopRequested = false;
+    this.pauseRequested = false;
     store.setHuntStatus(huntId, 'discovering');
     this.pushHunt(huntId);
     try {
-      this.log(huntId, 'info', `Starting hunt: "${hunt.query}" — opening browser…`);
-      const ctx = await this.openBrowser();
-      const page = await ctx.newPage();
-      const url = 'https://www.google.com/maps/search/' + encodeURIComponent(hunt.query) + '?hl=en';
-      this.log(huntId, 'info', 'Opening Google Maps search…');
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-      this.log(huntId, 'info', 'Page loaded — waiting for the results list…');
-      // consent button rarely appears; click it if it does but never wait for it
-      page.locator('button[aria-label*="Accept"], form[action*="consent"] button').first()
-        .click({ timeout: 4000 }).catch(() => {});
-
-      const bodyText = await page.evaluate(() => document.body.innerText.slice(0, 4000)).catch(() => '');
-      if (this.isBlockedPage(page.url(), bodyText)) {
-        await page.close();
-        return this.enterCaptchaState(huntId, url);
-      }
-
-      // query may resolve straight to a single place page
-      if (page.url().includes('/maps/place/')) {
-        const name = await page.locator('h1').first().textContent({ timeout: 15000 }).catch(() => hunt.query);
-        store.addDiscoveredPlace(huntId, (name || '').trim(), page.url());
-        store.setHuntTotals(huntId, { totalFound: 1 });
-        store.setHuntStatus(huntId, 'ready');
-        this.log(huntId, 'info', 'Google returned a single place for this query.');
-        await page.close();
-        this.activeHuntId = null;
-        this.pushHunt(huntId);
-        return;
-      }
-
-      this.log(huntId, 'info', 'Results list found — scrolling to load every place…');
-      // places are stored after every pass, so nothing is lost if a deep
-      // search is stopped halfway
-      const store_ = listings => {
+      // every place seen on screen is saved as it appears (see scrapeFeed), so
+      // a shutdown at any moment loses nothing
+      let lastLoggedTotal = store.countPlaces(huntId);
+      const saveBatch = listings => {
         let n = 0;
         for (const l of listings) if (store.addDiscoveredPlace(huntId, l.name, l.url, l.category)) n++;
         const total = store.countPlaces(huntId);
         store.setHuntTotals(huntId, { totalFound: total });
         this.emit('discover-progress', { huntId, count: total }); // authoritative, only grows
+        if (total >= lastLoggedTotal + 15) { lastLoggedTotal = total; this.log(huntId, 'info', `…${total} places found so far`); }
         return n;
       };
-      store_(await this.scrapeFeed(page, huntId, 0));
 
-      if (hunt.deep && !this.stopRequested) {
-        let lat, lng;
-        const m = page.url().match(/@(-?\d+\.\d+),(-?\d+\.\d+),/);
-        if (m) { lat = +m[1]; lng = +m[2]; }
-        else {
-          const first = store.pendingPlaces(huntId, 1)[0];
-          const c = first && first.maps_url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
-          if (c) { lat = +c[1]; lng = +c[2]; }
+      const ctx = await this.openBrowser();
+      const page = await ctx.newPage();
+
+      // a hunt shut down mid-deep-search skips the base search (its places are
+      // already saved) and continues from the exact pass it stopped at
+      const resuming = hunt.deep && (hunt.deep_pass | 0) > 0;
+      if (resuming) {
+        this.log(huntId, 'info', `Continuing the deep search from where it stopped — ${store.countPlaces(huntId)} places already found.`);
+      } else {
+        this.log(huntId, 'info', `Starting hunt: "${hunt.query}" — opening browser…`);
+        const url = 'https://www.google.com/maps/search/' + encodeURIComponent(hunt.query) + '?hl=en';
+        this.log(huntId, 'info', 'Opening Google Maps search…');
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        this.log(huntId, 'info', 'Page loaded — waiting for the results list…');
+        // consent button rarely appears; click it if it does but never wait for it
+        page.locator('button[aria-label*="Accept"], form[action*="consent"] button').first()
+          .click({ timeout: 4000 }).catch(() => {});
+
+        const bodyText = await page.evaluate(() => document.body.innerText.slice(0, 4000)).catch(() => '');
+        if (this.isBlockedPage(page.url(), bodyText)) {
+          await page.close();
+          return this.enterCaptchaState(huntId, url);
         }
-        const passes = this.buildDeepPasses(hunt, lat, lng);
-        if (!passes.length) this.log(huntId, 'warn', 'Could not work out the map position — deep search skipped.');
 
+        // query may resolve straight to a single place page
+        if (page.url().includes('/maps/place/')) {
+          const name = await page.locator('h1').first().textContent({ timeout: 15000 }).catch(() => hunt.query);
+          store.addDiscoveredPlace(huntId, (name || '').trim(), page.url());
+          store.setHuntTotals(huntId, { totalFound: 1 });
+          store.setHuntStatus(huntId, 'ready');
+          this.log(huntId, 'info', 'Google returned a single place for this query.');
+          await page.close();
+          this.activeHuntId = null;
+          this.pushHunt(huntId);
+          return;
+        }
+
+        this.log(huntId, 'info', 'Results list found — scrolling to load every place…');
+        await this.scrapeFeed(page, huntId, saveBatch);
+      }
+
+      if (hunt.deep && !this.stopRequested && !this.pauseRequested) {
+        // map centre: reuse the saved one on resume, otherwise work it out once
+        let lat = parseFloat(hunt.deep_lat), lng = parseFloat(hunt.deep_lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          const m = page.url().match(/@(-?\d+\.\d+),(-?\d+\.\d+),/);
+          if (m) { lat = +m[1]; lng = +m[2]; }
+          else {
+            const first = store.pendingPlaces(huntId, 1)[0];
+            const c = first && first.maps_url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+            if (c) { lat = +c[1]; lng = +c[2]; }
+          }
+          if (Number.isFinite(lat) && Number.isFinite(lng)) store.setDeepProgress(huntId, { lat, lng });
+        }
+        const variants = this.buildVariantPasses(hunt);
+        if (!Number.isFinite(lat)) this.log(huntId, 'warn', 'Could not work out the map position — only different wordings will be tried.');
+
+        // no fixed number of passes: rings of map tiles spiral outwards for as
+        // long as they keep producing new places, and stop only after
+        // DEEP_STOP_AFTER_EMPTY searches in a row find nothing new
         const target = hunt.target | 0;
-        let dry = 0;
-        for (let i = 0; i < passes.length && !this.stopRequested; i++) {
+        let dry = hunt.deep_dry | 0;
+        for (let i = hunt.deep_pass | 0; !this.stopRequested && !this.pauseRequested; i++) {
+          const pass = this.deepPassAt(variants, hunt, lat, lng, i);
+          if (!pass) break; // no map position → nothing beyond the wording variants
           const have = store.countPlaces(huntId);
           if (target && have >= target) {
             this.log(huntId, 'info', `Reached your target of ${target} places — stopping the deep search here.`);
             break;
           }
-          this.log(huntId, 'info', `Looking deeper (${i + 1} of up to ${passes.length}) — ${have} found so far…`);
+          this.log(huntId, 'info', `Looking deeper (search ${i + 1}) — ${have} found so far…`);
           let fresh = 0;
           try {
-            await page.goto(passes[i].url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await page.goto(pass.url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            const probe = await page.evaluate(() => document.body.innerText.slice(0, 4000)).catch(() => '');
+            if (this.isBlockedPage(page.url(), probe)) {
+              // progress is saved first, so the hunt continues from this very
+              // pass once the captcha is cleared
+              store.setDeepProgress(huntId, { pass: i, dry });
+              await page.close().catch(() => {});
+              return this.enterCaptchaState(huntId, pass.url);
+            }
             // scrapeFeed waits for the list; a pass without one (e.g. a redirect
             // straight to a single place) simply times out and is skipped
-            fresh = store_(await this.scrapeFeed(page, huntId, store.countPlaces(huntId), 15000, false));
+            fresh = await this.scrapeFeed(page, huntId, saveBatch, 15000);
           } catch {
             this.log(huntId, 'warn', `That search showed no list — skipped.`);
           }
           if (fresh > 0) { dry = 0; this.log(huntId, 'info', `+${fresh} new place${fresh > 1 ? 's' : ''} (${store.countPlaces(huntId)} total)`); }
-          else if (++dry >= cfg.DEEP_STOP_AFTER_EMPTY) {
+          else dry++;
+          store.setDeepProgress(huntId, { pass: i + 1, dry }); // survives a shutdown
+          if (dry >= cfg.DEEP_STOP_AFTER_EMPTY) {
             this.log(huntId, 'info', `Nothing new in the last ${dry} searches — that is everything Google will show for this area.`);
             break;
           }
@@ -204,23 +235,31 @@ class HuntEngine {
 
       const total = store.countPlaces(huntId);
       store.setHuntTotals(huntId, { totalFound: total });
-      if (!this.stopRequested) store.setDiscoveryDone(huntId, true);
-      store.setHuntStatus(huntId, this.stopRequested ? 'cancelled' : 'ready');
-      const tgt = hunt.target | 0;
-      this.log(huntId, 'info', `Search finished: ${total} different places found for this area.` +
-        (tgt && total < tgt ? ` (You expected ${tgt} — Google does not list more than this for the words used. Try a smaller sub-area, e.g. block by block.)` : ''));
+      if (this.stopRequested) {
+        store.setHuntStatus(huntId, 'cancelled');
+        this.log(huntId, 'warn', `Search stopped — the ${total} places found are kept safe. Resume continues from this exact point.`);
+      } else if (this.pauseRequested) {
+        store.setHuntStatus(huntId, 'paused');
+        this.log(huntId, 'info', `Search paused — the ${total} places found are kept safe. Resume continues from this exact point.`);
+      } else {
+        store.setDiscoveryDone(huntId, true);
+        store.setHuntStatus(huntId, 'ready');
+        const tgt = hunt.target | 0;
+        this.log(huntId, 'info', `Search finished: ${total} different places found for this area.` +
+          (tgt && total < tgt ? ` (You expected ${tgt} — Google does not list more than this for the words used. Try a smaller sub-area, e.g. block by block.)` : ''));
+      }
     } catch (e) {
       store.setHuntStatus(huntId, 'error', e.message.split('\n')[0]);
-      this.log(huntId, 'error', `Discovery failed: ${e.message.split('\n')[0]}`);
+      this.log(huntId, 'error', `Discovery failed: ${e.message.split('\n')[0]} — everything found so far is saved.`);
     } finally {
-      if (store.getHunt(huntId).status !== 'captcha') this.activeHuntId = null;
+      if (store.getHunt(huntId)?.status !== 'captcha') this.activeHuntId = null;
       this.pushHunt(huntId);
     }
   }
 
-  // Extra searches for a deep hunt, cheapest-and-richest first:
-  // wording variants, then rings of map tiles spiralling outwards.
-  buildDeepPasses(hunt, lat, lng) {
+  // Wording variants for a deep hunt — the cheapest-and-richest extra searches,
+  // tried before the map tiles.
+  buildVariantPasses(hunt) {
     const passes = [];
     const q = s => `https://www.google.com/maps/search/${encodeURIComponent(s)}?hl=en`;
 
@@ -233,47 +272,34 @@ class HuntEngine {
       for (const v of ['near', 'in front of', 'best'])
         passes.push({ url: q(`${v} ${hunt.keyword} ${locality}`), label: `${v} wording` });
     }
-
-    if (lat !== undefined && lng !== undefined) {
-      // keyword-only queries follow the map position (a named-area query ignores
-      // the viewport), so each shifted tile surfaces a different set of places
-      const dirs = [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1]];
-      for (let ring = 1; ring <= cfg.DEEP_RINGS; ring++) {
-        const d = cfg.DEEP_TILE_OFFSET * ring;
-        for (const [dy, dx] of dirs) {
-          const la = (lat + dy * d).toFixed(5), ln = (lng + dx * d).toFixed(5);
-          passes.push({
-            url: `https://www.google.com/maps/search/${encodeURIComponent(hunt.keyword)}/@${la},${ln},${cfg.DEEP_TILE_ZOOM}z?hl=en`,
-            label: `ring ${ring}`,
-          });
-        }
-      }
-    }
-    return passes.slice(0, cfg.DEEP_MAX_PASSES);
+    return passes;
   }
 
-  // scrolls one results feed to its true end and returns all listing cards.
-  // baseCount only offsets the live counter shown in the UI.
-  // liveCount=false while re-searching: the feed repeats places already saved,
-  // so adding its raw length would make the on-screen number jump up and down
-  async scrapeFeed(page, huntId, baseCount = 0, waitMs = 30000, liveCount = true) {
-    await page.waitForSelector('div[role="feed"]', { timeout: waitMs });
-    let prev = -1, lastGrowth = Date.now(), lastLogged = 0;
-    for (let i = 0; i < 400; i++) {
-      if (this.stopRequested) break;
-      const count = await page.locator('a.hfpxzc').count();
-      if (count !== prev) { prev = count; lastGrowth = Date.now(); }
-      this.emit('discover-progress', { huntId, count: liveCount ? baseCount + count : store.countPlaces(huntId) });
-      if (liveCount && count >= lastLogged + 15) { lastLogged = count; this.log(huntId, 'info', `…${baseCount + count} places loaded so far`); }
-      const end = await page.locator('div[role="feed"]').evaluate(el => /reached the end of the list/i.test(el.innerText)).catch(() => false);
-      if (end) break;
-      // Google sometimes takes a while to fetch the next page — judge by time
-      // without growth, not by scroll attempts
-      if (Date.now() - lastGrowth > cfg.FEED_STALL_TIMEOUT_MS) { this.log(huntId, 'warn', 'List stopped growing — taking what Google gave.'); break; }
-      await page.locator('div[role="feed"]').evaluate(el => { el.scrollTop = el.scrollHeight; }).catch(() => {});
-      await sleep(rand([cfg.SCROLL_STEP_MIN_MS, cfg.SCROLL_STEP_MAX_MS]));
-    }
-    return page.locator('a.hfpxzc').evaluateAll(links =>
+  // The i-th deep pass: wording variants first, then rings of map tiles
+  // spiralling outwards without end (the dry-run counter is what stops them).
+  // Deterministic in i, so a resumed hunt replays the exact same sequence.
+  deepPassAt(variants, hunt, lat, lng, i) {
+    if (i < variants.length) return variants[i];
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    // keyword-only queries follow the map position (a named-area query ignores
+    // the viewport), so each shifted tile surfaces a different set of places
+    const dirs = [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1]];
+    const k = i - variants.length;
+    const ring = Math.floor(k / dirs.length) + 1;
+    const [dy, dx] = dirs[k % dirs.length];
+    const d = cfg.DEEP_TILE_OFFSET * ring;
+    const la = (lat + dy * d).toFixed(5), ln = (lng + dx * d).toFixed(5);
+    return {
+      url: `https://www.google.com/maps/search/${encodeURIComponent(hunt.keyword)}/@${la},${ln},${cfg.DEEP_TILE_ZOOM}z?hl=en`,
+      label: `ring ${ring}`,
+    };
+  }
+
+  // scrolls one results feed to its true end, handing every ~10 freshly loaded
+  // cards to saveBatch as they appear — so a shutdown mid-scroll keeps
+  // everything already seen. Returns how many places in this feed were new.
+  async scrapeFeed(page, huntId, saveBatch, waitMs = 30000) {
+    const extract = () => page.locator('a.hfpxzc').evaluateAll(links =>
       links.map(a => {
         // category from the result card: either "Category · address" or, for
         // lodging cards, a standalone line right after the rating line
@@ -293,6 +319,25 @@ class HuntEngine {
         }
         return { name: a.getAttribute('aria-label') || '', url: a.href, category };
       }));
+
+    await page.waitForSelector('div[role="feed"]', { timeout: waitMs });
+    let added = 0, savedUpTo = 0;
+    let prev = -1, lastGrowth = Date.now();
+    for (let i = 0; i < 400; i++) {
+      if (this.stopRequested || this.pauseRequested) break;
+      const count = await page.locator('a.hfpxzc').count();
+      if (count !== prev) { prev = count; lastGrowth = Date.now(); }
+      if (count >= savedUpTo + 10) { added += saveBatch(await extract()); savedUpTo = count; }
+      const end = await page.locator('div[role="feed"]').evaluate(el => /reached the end of the list/i.test(el.innerText)).catch(() => false);
+      if (end) break;
+      // Google sometimes takes a while to fetch the next page — judge by time
+      // without growth, not by scroll attempts
+      if (Date.now() - lastGrowth > cfg.FEED_STALL_TIMEOUT_MS) { this.log(huntId, 'warn', 'List stopped growing — taking what Google gave.'); break; }
+      await page.locator('div[role="feed"]').evaluate(el => { el.scrollTop = el.scrollHeight; }).catch(() => {});
+      await sleep(rand([cfg.SCROLL_STEP_MIN_MS, cfg.SCROLL_STEP_MAX_MS]));
+    }
+    added += saveBatch(await extract().catch(() => []));
+    return added;
   }
 
   // -------- phase 2: fetch details --------
@@ -331,8 +376,8 @@ class HuntEngine {
       let inBatch = 0;
 
       while (true) {
-        if (this.stopRequested) { store.setHuntStatus(huntId, 'cancelled'); this.log(huntId, 'warn', 'Hunt cancelled. Fetched data is saved.'); break; }
-        if (this.pauseRequested) { store.setHuntStatus(huntId, 'paused'); this.log(huntId, 'info', 'Hunt paused. Resume anytime — nothing lost.'); break; }
+        if (this.stopRequested) { store.setHuntStatus(huntId, 'cancelled'); this.log(huntId, 'warn', 'Stopped — everything collected so far is saved.'); break; }
+        if (this.pauseRequested) { store.setHuntStatus(huntId, 'paused'); this.log(huntId, 'info', 'Paused — resume anytime, nothing is lost.'); break; }
 
         const already = store.fetchedCount(huntId);
         if (limit && already >= limit) {
@@ -434,11 +479,12 @@ class HuntEngine {
       if (!key) continue;
       const prev = store.findFetchedByKey(key, huntId);
       if (!prev) continue;
+      const src = [prev.src_subarea, prev.src_area, prev.src_city].filter(Boolean).join(', ');
       store.savePlaceDetail(pl.id, {
         name: prev.name, phone: prev.phone, email: prev.email, address: prev.address,
         website: prev.website, rating: prev.rating, reviews: prev.reviews,
         category: prev.category, plusCode: prev.plus_code, lat: prev.lat, lng: prev.lng,
-        dupFlag: 1, dupReason: 'already saved from an earlier search',
+        dupFlag: 1, dupReason: `already saved as "${prev.name}"${src ? ` in the ${src} search` : ''}`,
       });
       copied++;
     }
@@ -449,15 +495,15 @@ class HuntEngine {
     const norm = (d.phone || '').replace(/\D/g, '').slice(-10);
     if (norm.length === 10) {
       if (this.masterPhones && this.masterPhones.has(norm)) {
-        return { flag: 1, reason: 'number already in the master list' };
+        return { flag: 1, reason: `number ${d.phone} is already in the master contact list` };
       }
       const owner = store.findPhoneOwner(norm, placeId);
-      if (owner) return { flag: 1, reason: `same phone as "${owner.name}" (${owner.subarea || owner.area || 'earlier hunt'})` };
+      if (owner) return { flag: 1, reason: `same phone as "${owner.name}"${owner.subarea || owner.area ? ` (${owner.subarea || owner.area})` : ''}` };
     }
     const nn = (d.name || '').toLowerCase().replace(/[\s\-]/g, '');
     if (nn) {
       const sim = store.findSimilarName(nn, huntId, placeId);
-      if (sim) return { flag: 1, reason: `same name as another result in this hunt` };
+      if (sim) return { flag: 1, reason: `same name as "${sim.name}" in this search` };
     }
     return { flag: 0, reason: '' };
   }
@@ -485,31 +531,40 @@ class HuntEngine {
 
   // opens a VISIBLE window on the captcha for a human to click through
   async openSolverWindow(huntId) {
-    clearTimeout(this._retryTimer);
-    await this.closeBrowser();
-    this.solverCtx = await chromium.launchPersistentContext(PROFILE_DIR, {
-      headless: false,
-      viewport: { width: 1100, height: 800 },
-      locale: 'en-US',
-      userAgent: UA,
-      args: ['--disable-blink-features=AutomationControlled'],
-    });
-    const page = await this.solverCtx.newPage();
-    await page.goto(this.captchaUrl || 'https://www.google.com/maps?hl=en', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
-    this.log(huntId, 'info', 'Solver window opened — complete the verification there, the hunt resumes by itself.');
-    // poll until the block is gone, then auto-close and resume
-    for (let i = 0; i < 150; i++) {
-      await sleep(2000);
-      let cleared = false;
-      try {
-        const u = page.url();
-        const body = await page.evaluate(() => document.body.innerText.slice(0, 4000));
-        cleared = !this.isBlockedPage(u, body);
-      } catch { break; } // window closed by user — treat as attempt done
-      if (cleared) break;
+    // a second click must not open a second window — two browsers on the same
+    // profile fight over its lock and crash (the flag also covers the moment
+    // before the window handle exists)
+    if (this.solverCtx || this._solverOpening) return;
+    this._solverOpening = true;
+    try {
+      clearTimeout(this._retryTimer);
+      await this.closeBrowser();
+      this.solverCtx = await chromium.launchPersistentContext(PROFILE_DIR, {
+        headless: false,
+        viewport: { width: 1100, height: 800 },
+        locale: 'en-US',
+        userAgent: UA,
+        args: ['--disable-blink-features=AutomationControlled'],
+      });
+      const page = await this.solverCtx.newPage();
+      await page.goto(this.captchaUrl || 'https://www.google.com/maps?hl=en', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
+      this.log(huntId, 'info', 'Solver window opened — complete the verification there, the hunt resumes by itself.');
+      // poll until the block is gone, then auto-close and resume
+      for (let i = 0; i < 150; i++) {
+        await sleep(2000);
+        let cleared = false;
+        try {
+          const u = page.url();
+          const body = await page.evaluate(() => document.body.innerText.slice(0, 4000));
+          cleared = !this.isBlockedPage(u, body);
+        } catch { break; } // window closed by user — treat as attempt done
+        if (cleared) break;
+      }
+    } finally {
+      try { if (this.solverCtx) await this.solverCtx.close(); } catch {}
+      this.solverCtx = null;
+      this._solverOpening = false;
     }
-    try { await this.solverCtx.close(); } catch {}
-    this.solverCtx = null;
     await this.resumeAfterCaptcha(huntId);
   }
 
@@ -523,8 +578,48 @@ class HuntEngine {
   }
 
   // -------- controls --------
-  cancel() { this.stopRequested = true; }
-  pause() { this.pauseRequested = true; }
+  // the flags are only noticed at the next safe checkpoint (between places /
+  // scroll steps), so flip the status to a transient "stopping…"/"pausing…"
+  // right away — the user sees the click landed the same instant
+  cancel() {
+    const id = this.activeHuntId;
+    const h = id && store.getHunt(id);
+    if (h && ['discovering', 'fetching'].includes(h.status)) {
+      store.setHuntStatus(id, 'stopping');
+      this.log(id, 'warn', 'Stopping — letting the current step finish safely, a few seconds…');
+      this.pushHunt(id);
+    }
+    this.stopRequested = true;
+  }
+  pause() {
+    const id = this.activeHuntId;
+    const h = id && store.getHunt(id);
+    if (h && ['discovering', 'fetching'].includes(h.status)) {
+      store.setHuntStatus(id, 'pausing');
+      this.log(id, 'info', 'Pausing — letting the current step finish safely, a few seconds…');
+      this.pushHunt(id);
+    }
+    this.pauseRequested = true;
+  }
+
+  // called when the black window is closed: stop the loops, free the browser,
+  // and leave the running hunt as "paused" so Resume continues from that point.
+  // Windows only grants a few seconds after the X is clicked, so no waiting.
+  async shutdown() {
+    const runningId = this.activeHuntId;
+    this.stopRequested = true;
+    this.pauseRequested = true;
+    clearTimeout(this._retryTimer);
+    if (this.solverCtx) { try { await this.solverCtx.close(); } catch {} this.solverCtx = null; }
+    await this.closeBrowser();
+    // closing the browser makes the hunt loops throw; whatever status they
+    // wrote in the race, "paused" is the truth the next start should see
+    const ids = new Set([runningId, ...this.queue].filter(Boolean));
+    for (const id of ids) {
+      const h = store.getHunt(id);
+      if (h && !['done', 'ready'].includes(h.status)) store.setHuntStatus(id, 'paused');
+    }
+  }
 }
 
 module.exports = new HuntEngine();

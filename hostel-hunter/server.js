@@ -41,7 +41,7 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 
 // on startup, any hunt left "fetching"/"discovering" by a crash becomes resumable
 for (const h of store.listHunts()) {
-  if (['fetching', 'discovering', 'captcha', 'queued'].includes(h.status)) {
+  if (['fetching', 'discovering', 'stopping', 'pausing', 'captcha', 'queued'].includes(h.status)) {
     store.clearRunStart(h.id); // time since the crash was not work
     store.setHuntStatus(h.id, 'paused');
   }
@@ -78,7 +78,7 @@ const server = http.createServer(async (req, res) => {
       const query = `${keyword} in ${locality}`;
       const hunt = store.createHunt({
         keyword, city, area, subarea, query,
-        maxResults: b.maxResults, batchSize: b.batchSize, deep: b.deep, target: b.target,
+        maxResults: b.maxResults, batchSize: b.batchSize, deep: b.deep !== false, target: b.target,
       });
       engine.enqueue(hunt.id); // starts now, or waits its turn; monitor via SSE
       return json(res, 200, { hunt: store.getHunt(hunt.id), queued: engine.queue.length });
@@ -170,6 +170,37 @@ server.on('error', e => {
 loadMasterPhones();
 server.listen(PORT, () => {
   const addr = `http://localhost:${PORT}`;
-  console.log(`\n  Web 7 Labs — Hostel Hunter running at ${addr}\n`);
+  console.log(`\n  Web 7 Labs — Hostel Hunter running at ${addr}`);
+  console.log(`  To stop it, simply close this window — everything is saved automatically.\n`);
   if (cfg.AUTO_OPEN_BROWSER && !process.env.NO_OPEN) execFile('cmd', ['/c', 'start', '', addr], () => {});
 });
+
+// Closing the black window (CTRL_CLOSE_EVENT → SIGHUP), Ctrl+C (SIGINT) or a
+// kill (SIGTERM/SIGBREAK) all land here: mark the running hunt paused, close
+// the browser and database, and free the port. Windows gives a console app
+// only ~5 seconds after the X is clicked, so this stays quick.
+let shuttingDown = false;
+async function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log('\n  Closing — saving everything…');
+  // backstop: if any close step hangs, exit anyway instead of lingering as a
+  // ghost process that keeps the port taken
+  setTimeout(() => process.exit(0), 4000).unref();
+  try { server.close(); } catch {}
+  for (const res of sseClients) { try { res.end(); } catch {} }
+  try { await engine.shutdown(); } catch {}
+  try { store.close(); } catch {}
+  process.exit(0);
+}
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK']) process.on(sig, shutdown);
+// Windows Terminal (the default "black window" on Windows 11) does not always
+// deliver the close signal to Node — but closing the window always severs
+// stdin, so a dead stdin is treated as the same "please shut down" request.
+if (process.stdin.isTTY) {
+  process.stdin.resume();
+  process.stdin.on('end', shutdown);
+  process.stdin.on('error', shutdown);
+}
+// the console can die before we do — a failing log write must never crash us
+process.stdout.on('error', () => {});

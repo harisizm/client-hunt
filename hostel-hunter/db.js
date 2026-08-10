@@ -70,6 +70,13 @@ try {
   db.exec("UPDATE hunts SET discovery_done = 1 WHERE status = 'done'");
 } catch {}
 try { db.exec('ALTER TABLE hunts ADD COLUMN run_started_at TEXT'); } catch {}
+// deep-search progress: which extra search is next, how many in a row found
+// nothing, and the map centre — so a shutdown mid-deep-search resumes exactly
+// where it stopped instead of starting the passes over
+try { db.exec('ALTER TABLE hunts ADD COLUMN deep_pass INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE hunts ADD COLUMN deep_dry INTEGER DEFAULT 0'); } catch {}
+try { db.exec("ALTER TABLE hunts ADD COLUMN deep_lat TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE hunts ADD COLUMN deep_lng TEXT DEFAULT ''"); } catch {}
 db.exec(`
   CREATE TABLE IF NOT EXISTS exports (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -125,6 +132,11 @@ function setHuntStatus(id, status, error = '') {
 }
 function setDiscoveryDone(id, done) {
   db.prepare('UPDATE hunts SET discovery_done = ? WHERE id = ?').run(done ? 1 : 0, id);
+}
+function setDeepProgress(id, { pass, dry, lat, lng }) {
+  if (pass !== undefined) db.prepare('UPDATE hunts SET deep_pass = ? WHERE id = ?').run(pass | 0, id);
+  if (dry !== undefined) db.prepare('UPDATE hunts SET deep_dry = ? WHERE id = ?').run(dry | 0, id);
+  if (lat !== undefined) db.prepare('UPDATE hunts SET deep_lat = ?, deep_lng = ? WHERE id = ?').run(String(lat), String(lng), id);
 }
 function clearHuntLimit(id) {
   db.prepare('UPDATE hunts SET max_results = 0 WHERE id = ?').run(id);
@@ -197,10 +209,13 @@ function findPhoneOwner(normPhone, excludePlaceId) {
   ).get(excludePlaceId, normPhone);
 }
 function findFetchedByKey(key, excludeHuntId) {
-  // key is the stable Google place id (0x…:0x…) embedded in every maps URL
+  // key is the stable Google place id (0x…:0x…) embedded in every maps URL;
+  // the hunt columns ride along so the duplicate note can say which search
   return db.prepare(
-    `SELECT * FROM places WHERE hunt_id != ? AND fetched_at IS NOT NULL AND fetch_error = ''
-     AND instr(maps_url, ?) > 0 ORDER BY id DESC LIMIT 1`
+    `SELECT p.*, h.subarea AS src_subarea, h.area AS src_area, h.city AS src_city
+     FROM places p JOIN hunts h ON h.id = p.hunt_id
+     WHERE p.hunt_id != ? AND p.fetched_at IS NOT NULL AND p.fetch_error = ''
+     AND instr(p.maps_url, ?) > 0 ORDER BY p.id DESC LIMIT 1`
   ).get(excludeHuntId, key);
 }
 function findSimilarName(normName, huntId, excludePlaceId) {
@@ -249,9 +264,16 @@ function recentLogs(limit = 200) {
   return db.prepare('SELECT * FROM logs ORDER BY id DESC LIMIT ?').all(limit).reverse();
 }
 
+// ---- shutdown ----
+function close() {
+  // fold the WAL back into the main file so hunter.db alone is a full backup
+  try { db.exec('PRAGMA wal_checkpoint(TRUNCATE)'); } catch {}
+  try { db.close(); } catch {}
+}
+
 module.exports = {
-  db, createHunt, getHunt, listHunts, setHuntStatus, clearRunStart, clearHuntLimit,
-  setDiscoveryDone, setHuntTotals,
+  db, close, createHunt, getHunt, listHunts, setHuntStatus, clearRunStart, clearHuntLimit,
+  setDiscoveryDone, setDeepProgress, setHuntTotals,
   addDiscoveredPlace, countPlaces, pendingPlaces, savePlaceDetail, setPlaceError, fetchedCount,
   placesForHunts, findPhoneOwner, findSimilarName, findFetchedByKey, deleteHunt,
   recordExport, exportsInvolvingHunt, deleteExportRecord,

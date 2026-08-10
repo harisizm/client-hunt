@@ -19,9 +19,7 @@ const DEFAULTS = {
 
   DEEP_TILE_OFFSET: 0.012,
   DEEP_TILE_ZOOM: 15,
-  DEEP_MAX_PASSES: 30,
-  DEEP_STOP_AFTER_EMPTY: 5,
-  DEEP_RINGS: 3,
+  DEEP_STOP_AFTER_EMPTY: 4,
 
   HEADLESS: true,
   USER_AGENT: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
