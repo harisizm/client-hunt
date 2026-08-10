@@ -6,25 +6,81 @@ let activeHuntId = null;
 let masterCount = 0;
 
 // ---------- rendering ----------
+// statuses where the engine is actively doing (or finishing) work
+const RUNNING = ['discovering', 'fetching', 'stopping', 'pausing'];
+
 function statusChip(s) {
   const labels = {
     queued: 'waiting in queue', discovering: 'searching…', ready: 'ready', fetching: 'getting details…',
+    stopping: 'stopping…', pausing: 'pausing…',
     paused: 'paused', done: 'finished', cancelled: 'stopped',
     captcha: 'needs a check', error: 'problem',
   };
-  return `<span class="status-chip st-${s}">${labels[s] || s}</span>`;
+  // hover text in plain words — what the status means and what to do about it
+  const tips = {
+    queued: 'Waiting its turn — searches run one at a time so Google stays happy.',
+    discovering: 'Searching the map and saving every place it finds.',
+    ready: 'Places found — collecting their details is next.',
+    fetching: 'Opening each place and saving its phone, address and rating.',
+    stopping: 'Finishing the current step safely, then it stops — a few seconds.',
+    pausing: 'Finishing the current step safely, then it pauses — a few seconds.',
+    paused: 'Stopped half-way. Nothing is lost — press Continue and it picks up exactly where it left off.',
+    done: 'All finished — ready to download.',
+    cancelled: 'Stopped by you. Everything collected so far is saved — press Continue to finish it.',
+    captcha: 'Google wants a quick human check — click “Fix it now”.',
+    error: 'Something went wrong. Nothing was lost — press Continue to try again.',
+  };
+  return `<span class="status-chip st-${s}" data-tip="${tips[s] || ''}">${labels[s] || s}</span>`;
 }
+
+// ---------- hover popups ----------
+// One floating card for every element with data-tip. It is position:fixed and
+// placed by hand, so it shows above everything — including table headers and
+// status chips inside the scrolling table, where a pure-CSS popup gets clipped.
+const tipEl = document.createElement('div');
+tipEl.id = 'tooltip';
+tipEl.innerHTML = '<div class="tip-text"></div><div class="tip-arrow"></div>';
+document.body.appendChild(tipEl);
+function showTip(el) {
+  const text = el.dataset.tip;
+  if (!text) return;
+  tipEl.querySelector('.tip-text').textContent = text;
+  const r = el.getBoundingClientRect();
+  const w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+  let x = r.left + r.width / 2 - w / 2;
+  x = Math.max(8, Math.min(x, window.innerWidth - w - 8));
+  let y = r.top - h - 9, below = false;
+  if (y < 8) { y = r.bottom + 9; below = true; } // no room above → flip under
+  tipEl.style.left = x + 'px';
+  tipEl.style.top = y + 'px';
+  tipEl.classList.toggle('below', below);
+  // keep the arrow pointing at the icon even when the card was pushed sideways
+  tipEl.querySelector('.tip-arrow').style.left =
+    Math.max(12, Math.min(r.left + r.width / 2 - x, w - 12)) + 'px';
+  tipEl.classList.add('show');
+}
+const hideTip = () => tipEl.classList.remove('show');
+document.addEventListener('mouseover', e => {
+  const el = e.target.closest('[data-tip]');
+  el ? showTip(el) : hideTip();
+});
+document.addEventListener('focusin', e => {
+  const el = e.target.closest('[data-tip]');
+  if (el) showTip(el);
+});
+document.addEventListener('focusout', hideTip);
+window.addEventListener('scroll', hideTip, true);
 
 function renderActive() {
   const h = hunts.find(x => x.id === activeHuntId) ||
-            hunts.find(x => ['discovering', 'fetching', 'ready', 'captcha'].includes(x.status)) ||
+            hunts.find(x => [...RUNNING, 'ready', 'captcha'].includes(x.status)) ||
             hunts.find(x => x.status === 'queued') || hunts[0];
   const panel = $('#activePanel');
   if (!h) { panel.innerHTML = '<p class="muted">Nothing running. Fill the form on the left and click <b>Find places</b>.</p>'; return; }
 
   document.querySelector('.area-active').dataset.state = h.status;
   const pct = h.total_found ? Math.round(100 * h.fetched_count / h.total_found) : 0;
-  const working = ['discovering', 'fetching'].includes(h.status);
+  const working = RUNNING.includes(h.status);
   const started = parseSql(h.created_at), finished = parseSql(h.finished_at);
   let times = `Started <b class="t-accent">${fmt12(started)}</b>`;
   if (finished) times += ` &nbsp;·&nbsp; Finished <b class="t-green">${fmt12(finished)}</b> &nbsp;·&nbsp; Working time <b class="t-gold">${fmtDur(workMs(h))}</b>`;
@@ -46,7 +102,11 @@ function renderActive() {
   if (h.status === 'ready') btns.push(`<button class="btn btn-primary" onclick="cmd(${h.id},'fetch')">▶ Get details of ${h.total_found} places</button>`);
   if (h.status === 'fetching') btns.push(`<button class="btn" onclick="cmd(${h.id},'pause')">⏸ Pause</button>`, `<button class="btn" onclick="cmd(${h.id},'cancel')">✖ Stop</button>`);
   if (h.status === 'discovering') btns.push(`<button class="btn" onclick="cmd(${h.id},'cancel')">✖ Stop</button>`);
-  if (h.status === 'paused') btns.push(`<button class="btn btn-primary" onclick="cmd(${h.id},'resume')">▶ Continue</button>`);
+  if (h.status === 'stopping') btns.push(`<button class="btn" disabled>⏳ Stopping…</button>`);
+  if (h.status === 'pausing') btns.push(`<button class="btn" disabled>⏳ Pausing…</button>`);
+  if (['paused', 'cancelled', 'error'].includes(h.status) && (h.total_found - h.fetched_count > 0 || !h.discovery_done)) {
+    btns.push(`<button class="btn btn-primary" onclick="cmd(${h.id},'resume')">▶ Continue</button>`);
+  }
   if (h.status === 'queued') btns.push(`<button class="btn" onclick="cmd(${h.id},'cancel')">✖ Take out of queue</button>`);
   if (h.status === 'captcha') btns.push(`<button class="btn btn-danger" onclick="cmd(${h.id},'solve')">Fix it now</button>`);
   if (h.status === 'done' && h.fetched_count > 0) {
@@ -66,7 +126,7 @@ function renderActive() {
   const badge = $('#queueBadge');
   badge.classList.toggle('hidden', waiting === 0);
   badge.textContent = waiting ? `${waiting} waiting in queue` : '';
-  $('#btnStart').textContent = hunts.some(x => ['discovering', 'fetching'].includes(x.status))
+  $('#btnStart').textContent = hunts.some(x => RUNNING.includes(x.status))
     ? '➕ Add to queue' : '🔍 Find places';
 }
 
@@ -75,9 +135,10 @@ function renderTable() {
   const tb = $('#huntsTable tbody');
   tb.innerHTML = hunts.map(h => {
     const pending = h.total_found - h.fetched_count;
-    const canResume = (['paused', 'cancelled', 'error', 'done'].includes(h.status) && pending > 0) || h.status === 'ready';
+    // resumable: details still missing, or the search itself never finished
+    const canResume = (['paused', 'cancelled', 'error', 'done'].includes(h.status) && (pending > 0 || !h.discovery_done)) || h.status === 'ready';
     const label = [h.subarea, h.area, h.city].filter(Boolean).join(', ');
-    const running = ['discovering', 'fetching'].includes(h.status);
+    const running = RUNNING.includes(h.status);
     if (h.status === 'queued') return `<tr class="row-queued">
       <td><input type="checkbox" class="huntPick" value="${h.id}" ${picked.has(String(h.id)) ? 'checked' : ''}></td>
       <td>${h.id}</td>
@@ -86,7 +147,7 @@ function renderTable() {
       <td class="muted">—</td><td class="muted">—</td>
       <td><span class="t-amber">in queue</span></td>
       <td class="muted">${esc((h.created_at || '').slice(0, 16))}</td>
-      <td class="row-actions"><button class="btn btn-sm" onclick="cmd(${h.id},'cancel')">✖</button><button class="btn btn-sm btn-del" onclick="delHunt(${h.id}, ${h.fetched_count})">🗑</button></td>
+      <td class="row-actions"><button class="btn btn-sm" data-tip="Take this search out of the queue." onclick="cmd(${h.id},'cancel')">✖</button><button class="btn btn-sm btn-del" data-tip="Delete this search." onclick="delHunt(${h.id}, ${h.fetched_count})">🗑</button></td>
     </tr>`;
     const took = h.finished_at
       ? `<span class="t-green">${fmtDur(workMs(h))}</span>`
@@ -103,7 +164,7 @@ function renderTable() {
       <td>${savedCell}</td>
       <td>${took}</td>
       <td class="muted">${esc((h.created_at || '').slice(0, 16))}</td>
-      <td class="row-actions">${h.fetched_count > 0 ? `<button class="btn btn-sm" title="download this search" onclick="rowExport(${h.id})">⬇</button>` : ''}${canResume ? `<button class="btn btn-sm" onclick="cmd(${h.id},'resume',true)">▶ ${h.status === 'ready' ? 'Get details' : 'Continue'}</button>` : ''}<button class="btn btn-sm btn-del" title="delete this search" onclick="delHunt(${h.id}, ${h.fetched_count})">🗑</button></td>
+      <td class="row-actions">${h.fetched_count > 0 ? `<button class="btn btn-sm btn-dl" data-tip="Download this search as an Excel file." onclick="rowExport(${h.id})">⬇ Excel</button>` : ''}${canResume ? `<button class="btn btn-sm btn-go" data-tip="Continue this search from the exact point it stopped — nothing is collected twice." onclick="cmd(${h.id},'resume',true)">▶ ${h.status === 'ready' ? 'Get details' : 'Continue'}</button>` : ''}<button class="btn btn-sm btn-del" data-tip="Delete this search and its collected places." onclick="delHunt(${h.id}, ${h.fetched_count})">🗑</button></td>
     </tr>`;
   }).join('');
 }
@@ -164,6 +225,7 @@ function logClass(level, message) {
   if (level === 'error') return 'log-error';
   if (/verification|captcha/i.test(message)) return 'log-error';
   if (level === 'warn') return 'log-warn';
+  if (/^(Stopping|Pausing) —/.test(message)) return 'log-warn';
   if (/^✗/.test(message)) return 'log-error';
   if (/^✓/.test(message)) return /possible duplicate/i.test(message) ? 'log-dup' : 'log-place';
   if (/^\+\d+ new place/.test(message)) return 'log-new';
@@ -228,27 +290,34 @@ const appConfirm = (msg, opts) => showModal(msg, { danger: true, okText: 'Yes, d
 const appInfo = msg => showModal(msg, { showCancel: false });
 
 // discard = stop the run (if running) and throw away everything it collected
+let discarding = false; // the stop-then-delete wait must not run twice at once
 window.discardHunt = async id => {
+  if (discarding) return;
   const h = hunts.find(x => x.id === id);
   const n = h ? h.fetched_count : 0;
-  const running = h && ['discovering', 'fetching'].includes(h.status);
+  const running = h && RUNNING.includes(h.status);
   const msg = `Discard this search?\n\n` +
     (running ? `It will be stopped, and ` : '') +
     (n > 0 ? `all its progress — ${n} places collected so far — will be deleted, along with any Excel files the app made from it.`
            : `it will be removed completely.`) +
     `\nCopies already saved in your Downloads folder are safe.`;
   if (!await appConfirm(msg, { okText: 'Yes, discard it' })) return;
-  if (running) {
-    await fetch(`/api/hunts/${id}/cancel`, { method: 'POST' }).catch(() => {});
-    addLog({ level: 'info', message: 'Stopping the search before discarding…', ts: new Date().toLocaleTimeString() });
-    for (let i = 0; i < 20; i++) {
-      await new Promise(r => setTimeout(r, 1000));
-      const s = await fetch('/api/state').then(r => r.json()).catch(() => null);
-      const cur = s && s.hunts.find(x => x.id === id);
-      if (!cur || !['discovering', 'fetching'].includes(cur.status)) break;
+  discarding = true;
+  try {
+    if (running) {
+      await fetch(`/api/hunts/${id}/cancel`, { method: 'POST' }).catch(() => {});
+      addLog({ level: 'info', message: 'Stopping the search before discarding…', ts: new Date().toLocaleTimeString() });
+      for (let i = 0; i < 20; i++) {
+        await new Promise(r => setTimeout(r, 1000));
+        const s = await fetch('/api/state').then(r => r.json()).catch(() => null);
+        const cur = s && s.hunts.find(x => x.id === id);
+        if (!cur || !RUNNING.includes(cur.status)) break;
+      }
     }
+    await cmd(id, 'delete');
+  } finally {
+    discarding = false;
   }
-  cmd(id, 'delete');
 };
 
 window.delHunt = async (id, count) => {
@@ -262,7 +331,10 @@ window.delHunt = async (id, count) => {
 // one shared export flow: builds the file and starts the download in one click.
 // Single-search downloads ignore the Area/Sub-area dropdowns (the search itself
 // already says which area the user wants).
+let exporting = false; // one export at a time, from whichever button
 async function doExport(ids, ignoreAreaFilters = false) {
+  if (exporting) return;
+  exporting = true;
   const out = $('#exportResult'), btn = $('#btnExport');
   const area = ignoreAreaFilters ? '' : $('#fArea').value;
   const subarea = ignoreAreaFilters ? '' : $('#fSubarea').value;
@@ -310,13 +382,14 @@ async function doExport(ids, ignoreAreaFilters = false) {
     out.textContent = 'Something went wrong — please try again.';
   } finally {
     btn.disabled = false;
+    exporting = false;
   }
 }
 
 window.rowExport = id => doExport([id], true);
 window.quickExport = id => doExport([id], true);
 
-const isBusy = () => hunts.some(x => ['discovering', 'fetching'].includes(x.status));
+const isBusy = () => hunts.some(x => RUNNING.includes(x.status));
 
 window.cmd = async (id, action, all) => {
   // only one search may talk to Google at a time — parallel runs risk a ban
@@ -334,15 +407,24 @@ window.cmd = async (id, action, all) => {
 // ---------- events ----------
 $('#huntForm').addEventListener('submit', async e => {
   e.preventDefault();
+  const btn = $('#btnStart');
+  if (btn.disabled) return; // a double-click must not create two searches
   const f = new FormData(e.target);
   const body = {
     keyword: f.get('keyword'), city: f.get('city'), area: f.get('area'), subarea: f.get('subarea'),
     maxResults: Number(f.get('maxResults')) || 0, batchSize: Number(f.get('batchSize')) || 10,
-    deep: !!f.get('deep'), target: Number(f.get('target')) || 0,
+    deep: true, // deep search is always on — no reason for the team to ever skip it
+    target: Number(f.get('target')) || 0,
   };
-  const r = await fetch('/api/hunts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
-  if (r.error) { addLog({ level: 'error', message: r.error, ts: new Date().toLocaleTimeString() }); return; }
-  refresh();
+  btn.disabled = true;
+  btn.textContent = '⏳ Starting…';
+  try {
+    const r = await fetch('/api/hunts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
+    if (r.error) addLog({ level: 'error', message: r.error, ts: new Date().toLocaleTimeString() });
+  } finally {
+    btn.disabled = false;
+    refresh(); // also restores the button label
+  }
 });
 
 $('#btnSolve').addEventListener('click', () => {
@@ -368,30 +450,41 @@ $('#btnDownloadSel').addEventListener('click', async () => {
 $('#btnDownloadAll').addEventListener('click', () => doExport([])); // [] = every search
 
 $('#btnResumeSel').addEventListener('click', async () => {
+  const btn = $('#btnResumeSel');
+  if (btn.disabled) return; // the one-by-one loop below runs long — never twice
   const ids = [...document.querySelectorAll('.huntPick:checked')].map(c => Number(c.value));
   if (!ids.length) { await appInfo('Tick at least one search first (use the top checkbox to select all).'); return; }
   const todo = hunts.filter(h => ids.includes(h.id) &&
-    (h.total_found - h.fetched_count > 0 || h.status === 'ready') &&
-    !['discovering', 'fetching'].includes(h.status));
+    (h.total_found - h.fetched_count > 0 || h.status === 'ready' || !h.discovery_done) &&
+    !RUNNING.includes(h.status));
   if (!todo.length) { await appInfo('The selected searches are already complete — nothing left to collect.'); return; }
   addLog({ level: 'info', message: `Continuing ${todo.length} search${todo.length > 1 ? 'es' : ''} one by one…`, ts: new Date().toLocaleTimeString() });
-  for (const h of todo) {
-    const r = await fetch(`/api/hunts/${h.id}/resume`, { method: 'POST' }).then(r => r.json()).catch(() => ({ error: 'failed' }));
-    if (r.error) { addLog({ level: 'warn', message: `Search #${h.id}: ${r.error}`, ts: new Date().toLocaleTimeString() }); continue; }
-    // only one search can talk to Google at a time — wait for this one to finish
-    await new Promise(res => {
-      const t = setInterval(async () => {
-        const s = await fetch('/api/state').then(r => r.json()).catch(() => null);
-        const cur = s && s.hunts.find(x => x.id === h.id);
-        if (!cur || !['discovering', 'fetching'].includes(cur.status)) { clearInterval(t); res(); }
-      }, 3000);
-    });
+  btn.disabled = true;
+  btn.textContent = '⏳ Collecting…';
+  try {
+    for (const h of todo) {
+      const r = await fetch(`/api/hunts/${h.id}/resume`, { method: 'POST' }).then(r => r.json()).catch(() => ({ error: 'failed' }));
+      if (r.error) { addLog({ level: 'warn', message: `Search #${h.id}: ${r.error}`, ts: new Date().toLocaleTimeString() }); continue; }
+      // only one search can talk to Google at a time — wait for this one to finish
+      await new Promise(res => {
+        const t = setInterval(async () => {
+          const s = await fetch('/api/state').then(r => r.json()).catch(() => null);
+          const cur = s && s.hunts.find(x => x.id === h.id);
+          if (!cur || !RUNNING.includes(cur.status)) { clearInterval(t); res(); }
+        }, 3000);
+      });
+    }
+    addLog({ level: 'info', message: 'All selected searches are done.', ts: new Date().toLocaleTimeString() });
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ Continue collecting';
+    refresh();
   }
-  addLog({ level: 'info', message: 'All selected searches are done.', ts: new Date().toLocaleTimeString() });
-  refresh();
 });
 
 $('#btnDeleteSel').addEventListener('click', async () => {
+  const btn = $('#btnDeleteSel');
+  if (btn.disabled) return;
   const ids = [...document.querySelectorAll('.huntPick:checked')].map(c => Number(c.value));
   if (!ids.length) { await appInfo('Tick at least one search first (use the top checkbox to select all).'); return; }
   const places = hunts.filter(h => ids.includes(h.id)).reduce((n, h) => n + h.fetched_count, 0);
@@ -399,15 +492,20 @@ $('#btnDeleteSel').addEventListener('click', async () => {
     (places > 0 ? `Their ${places} saved places will be removed, and Excel files the app made from them will be deleted too.\n` : '') +
     `Copies already saved in your Downloads folder are safe.`;
   if (!await appConfirm(msg)) return;
-  const problems = [];
-  for (const id of ids) {
-    const r = await fetch(`/api/hunts/${id}/delete`, { method: 'POST' }).then(r => r.json()).catch(() => ({ error: 'failed' }));
-    if (r.error) problems.push(`#${id}: ${r.error}`);
+  btn.disabled = true;
+  try {
+    const problems = [];
+    for (const id of ids) {
+      const r = await fetch(`/api/hunts/${id}/delete`, { method: 'POST' }).then(r => r.json()).catch(() => ({ error: 'failed' }));
+      if (r.error) problems.push(`#${id}: ${r.error}`);
+    }
+    $('#pickAll').checked = false;
+    if (problems.length) addLog({ level: 'warn', message: `Some could not be deleted — ${problems.join(' · ')}`, ts: new Date().toLocaleTimeString() });
+    else addLog({ level: 'info', message: `Deleted ${ids.length} search${ids.length > 1 ? 'es' : ''}.`, ts: new Date().toLocaleTimeString() });
+  } finally {
+    btn.disabled = false;
+    refresh();
   }
-  $('#pickAll').checked = false;
-  if (problems.length) addLog({ level: 'warn', message: `Some could not be deleted — ${problems.join(' · ')}`, ts: new Date().toLocaleTimeString() });
-  else addLog({ level: 'info', message: `Deleted ${ids.length} search${ids.length > 1 ? 'es' : ''}.`, ts: new Date().toLocaleTimeString() });
-  refresh();
 });
 
 $('#btnExport').addEventListener('click', () => {
@@ -433,5 +531,5 @@ refresh();
 setInterval(refresh, 15000); // safety net if SSE drops
 // live "running for…" clock while a search is active
 setInterval(() => {
-  if (hunts.some(x => ['discovering', 'fetching'].includes(x.status))) renderActive();
+  if (hunts.some(x => RUNNING.includes(x.status))) renderActive();
 }, 1000);

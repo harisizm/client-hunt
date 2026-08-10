@@ -21,7 +21,7 @@
     </div>
     <div class="head-right">
       <div class="master-info" id="masterInfo"></div>
-      <div class="head-note">works by itself · nothing gets lost · saved on this computer</div>
+      <div class="head-note">developed by <span class="dev-by">harisizm</span></div>
     </div>
   </header>
 
@@ -38,35 +38,32 @@
     <section class="card area-form">
       <h2><span class="dot"></span>New search</h2>
       <form id="huntForm">
-        <label>What to look for <input name="keyword" value="hostels" required></label>
+        <label><span class="lab">What to look for <span class="info" tabindex="0" data-tip="The kind of place to find — exactly what you would type into Google Maps. Examples: hostels, gyms, cafes, beauty salons.">i</span></span><input name="keyword" value="hostels" required></label>
         <label>City <input name="city" placeholder="Lahore"></label>
         <div class="row2">
           <label>Area <input name="area" placeholder="Gulberg"></label>
-          <label>Sub-area <input name="subarea" placeholder="C Block"></label>
+          <label><span class="lab">Sub-area <span class="info" tabindex="0" data-tip="Smaller area = better results. Google shows more places for &quot;Gulberg C Block&quot; than for the whole city, so searching block by block finds the most.">i</span></span><input name="subarea" placeholder="C Block"></label>
         </div>
         <details class="advanced">
           <summary>More options (you can ignore this)</summary>
-          <div class="row2">
-            <label>How many places to collect
-              <select name="maxResults">
-                <option value="0" selected>All of them (recommended)</option>
-                <option value="25">25 at a time, then stop</option>
-                <option value="50">50 at a time, then stop</option>
-                <option value="100">100 at a time, then stop</option>
-              </select>
-            </label>
-            <label>Speed
-              <select name="batchSize">
-                <option value="5">Extra careful — rests often</option>
-                <option value="10" selected>Normal (recommended)</option>
-                <option value="20">Faster — rests less</option>
-              </select>
-            </label>
-          </div>
+          <label><span class="lab">How many places to collect <span class="info" tabindex="0" data-tip="It always finds every place first — this only sets how many get full details (phone, address) in one go. Nothing is skipped: press Continue later to collect the rest.">i</span></span>
+            <select name="maxResults">
+              <option value="0" selected>All of them (recommended)</option>
+              <option value="25">25 at a time, then stop</option>
+              <option value="50">50 at a time, then stop</option>
+              <option value="100">100 at a time, then stop</option>
+            </select>
+          </label>
+          <label><span class="lab">Speed <span class="info" tabindex="0" data-tip="How many places it collects before taking a short rest. The rests make it look like a person browsing, which keeps Google relaxed. Normal is the safe choice.">i</span></span>
+            <select name="batchSize">
+              <option value="5">Extra careful — rests often</option>
+              <option value="10" selected>Normal (recommended)</option>
+              <option value="20">Faster — rests less</option>
+            </select>
+          </label>
           <p class="hint">The normal settings work great — no need to change anything. If a search stops early, everything already collected stays saved and you can continue anytime.</p>
         </details>
-        <label>How many do you expect to find? <input name="target" type="number" min="0" value="0" placeholder="0 = as many as possible"></label>
-        <label class="check deep-check"><input type="checkbox" name="deep" checked> Look extra deep — keeps trying different searches until nothing new comes up</label>
+        <label><span class="lab">How many do you expect to find? <span class="info" tabindex="0" data-tip="Optional. If you already know roughly how many exist in this area, type it — the search stops digging once it reaches that number. Leave 0 and it keeps digging until nothing new comes up.">i</span></span><input name="target" type="number" min="0" value="0" placeholder="0 = as many as possible"></label>
         <button type="submit" class="btn btn-primary btn-wide" id="btnStart">🔍 Find places</button>
         <p class="hint" style="margin-top:8px">Phone numbers and addresses are collected automatically. If something is already running, this one waits its turn.</p>
       </form>
@@ -104,7 +101,7 @@
           <div class="table-wrap">
             <table id="huntsTable">
               <thead>
-                <tr><th><input type="checkbox" id="pickAll" title="select all"></th><th>#</th><th>Search</th><th>Status</th><th>Found</th><th>Saved</th><th>Took</th><th>Date</th><th></th></tr>
+                <tr><th><input type="checkbox" id="pickAll" title="select all"></th><th>#</th><th>Search</th><th>Status <span class="info" tabindex="0" data-tip="Where the search stands right now. Hover any status badge below for what it means and what to do next.">i</span></th><th>Found <span class="info" tabindex="0" data-tip="How many places the search discovered on the map.">i</span></th><th>Saved <span class="info" tabindex="0" data-tip="How many of those places have their full details (phone, address, rating) saved. If some are left, press ▶ to collect the rest.">i</span></th><th>Took <span class="info" tabindex="0" data-tip="Actual working time only — pauses and waiting in the queue are not counted.">i</span></th><th>Date <span class="info" tabindex="0" data-tip="When this search was started.">i</span></th><th></th></tr>
               </thead>
               <tbody></tbody>
             </table>
@@ -112,11 +109,12 @@
         </div>
         <div class="bottom-right">
           <h2><span class="dot"></span>Download Excel file</h2>
+          <p class="hint" style="margin-bottom:10px">Filters only choose what goes into the file — nothing is ever deleted from the app.</p>
           <div class="filters">
             <label>File type
               <select id="fFormat"><option value="xlsx">Excel (.xlsx)</option><option value="csv">CSV</option></select>
             </label>
-            <label>Boys / girls
+            <label><span class="lab">Boys / girls <span class="info" tabindex="0" data-tip="Guesses from each place's name: &quot;girls only&quot; keeps names containing girls, female or ladies; &quot;boys only&quot; keeps boys or male. Places whose name says neither are left out.">i</span></span>
               <select id="fGender"><option value="">everything</option><option value="girls">girls only</option><option value="boys">boys only</option></select>
             </label>
             <label>Area
@@ -127,12 +125,12 @@
             </label>
             <label>Rating at least <input id="fMinRating" type="number" step="0.1" min="0" max="5" placeholder="any"></label>
             <label>Reviews at least <input id="fMinReviews" type="number" min="0" placeholder="any"></label>
-            <label>Type contains <input id="fCatInc" placeholder="hostel"></label>
-            <label>Type is NOT <input id="fCatExc" placeholder="hotel, guest house"></label>
+            <label><span class="lab">Type contains <span class="info" tabindex="0" data-tip="Keeps only places whose type or name contains these words — e.g. hostel. You can write several separated by commas.">i</span></span><input id="fCatInc" placeholder="hostel"></label>
+            <label><span class="lab">Type is NOT <span class="info" tabindex="0" data-tip="Removes place types you do not want — e.g. hotel, guest house. You can write several separated by commas.">i</span></span><input id="fCatExc" placeholder="hotel, guest house"></label>
             <label>Collected from <input id="fDateFrom" type="date"></label>
             <label>Collected until <input id="fDateTo" type="date"></label>
-            <label class="check"><input id="fHasPhone" type="checkbox"> only with phone number</label>
-            <label class="check"><input id="fNoDups" type="checkbox"> hide repeated ones</label>
+            <label class="check"><input id="fHasPhone" type="checkbox"> only with phone number <span class="info" tabindex="0" data-tip="Leaves out places where Google shows no phone number — handy when the file is for a calling campaign.">i</span></label>
+            <label class="check"><input id="fNoDups" type="checkbox"> hide repeated ones <span class="info" tabindex="0" data-tip="A repeat is a place whose phone or name you already have — from another search or the master contact list. They are normally kept and just marked in orange; tick this to leave them out of the file.">i</span></label>
           </div>
           <div class="export-actions">
             <button id="btnExport" class="btn btn-primary">⬇ Download Excel</button>
