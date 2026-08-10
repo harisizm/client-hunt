@@ -44,10 +44,15 @@ You should see something like `v24.x`. If you get
 
 ---
 
-## Step 2 — Copy this folder to the laptop
+## Step 2 — Get this folder onto the laptop
 
-Copy the whole **`marketing`** folder (this folder) to the laptop, e.g. to
-the Desktop. USB stick, network share, zip — anything.
+Either way works:
+
+- **From GitHub (no git needed):** open the repository page → green
+  **Code** button → **Download ZIP** → extract it on the laptop (the
+  folder will be named `web7labs-clienthunt-main` — rename it if you like).
+- **Direct copy:** copy the whole **`marketing`** folder via USB stick,
+  network share, zip — anything.
 
 What must be inside:
 
@@ -57,15 +62,23 @@ marketing\
 ├── SETUP.md                    ← this file
 └── hostel-hunter\
     ├── setup.bat               ← one-time installer
-    ├── .env                    ← all settings (speed, port, rests…)
+    ├── .env.example            ← all settings, documented
     ├── server.js, scraper.js, db.js, exporter.js, config.js
     ├── package.json
     └── public\  (the web page)
 ```
 
-You do **not** need to copy `node_modules`, `data`, or `exports` if they
-exist — setup recreates what's needed. (Copying `data\` DOES carry over all
-previously collected places — copy it if you want to keep them.)
+The app runs perfectly without a `.env` file — the built-in defaults are
+the recommended settings. To tune something later (port, speed, rests…),
+copy `.env.example` to `.env`, edit, and restart the app.
+
+You do **not** need to copy `node_modules`, `data`, or `exports` (a GitHub
+ZIP doesn't include them anyway) — setup and first start recreate what's
+needed. **Exception:** `data\hunter.db` holds everything collected so far
+*and* the master phone list used for duplicate marking. To carry those to
+the new laptop, copy `data\hunter.db` from the old machine into
+`hostel-hunter\data\` after extracting; skipping it just means the new
+laptop starts with an empty, fresh database.
 
 ---
 
@@ -117,7 +130,7 @@ If all four happen, the install is good.
 | All collected places (the database) | `data\hunter.db` |
 | Generated Excel/CSV files | `exports\` |
 | The app's own browser profile | `data\chrome-profile\` |
-| All tunable settings (port, speed, rests, deep search…) | `.env` — plain text, commented; edit + restart the app |
+| All tunable settings (port, speed, rests, deep search…) | `.env` — create it by copying `.env.example`; edit + restart the app. Without it the recommended defaults apply. |
 
 The database is the single source of truth (collected places, known master
 numbers, search history). Deleting `data\hunter.db` gives a clean, empty app
