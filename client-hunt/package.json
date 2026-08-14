@@ -1,7 +1,7 @@
 {
-  "name": "hostel-hunter",
+  "name": "client-hunt",
   "version": "1.0.0",
-  "description": "Web 7 Labs Marketing Team - Google Maps hostel lead finder",
+  "description": "Client Hunt - Automated Google Maps lead finder and data extraction engine",
   "private": true,
   "main": "server.js",
   "scripts": {

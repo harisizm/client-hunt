@@ -82,7 +82,7 @@ async function buildExport({ huntIds, format = 'xlsx', filters = {} }) {
   }
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'Web 7 Labs Marketing Team';
+  wb.creator = 'Client Hunt - Lead Generation Engine';
 
   // one sheet per hunt (i.e. per area searched)
   const usedNames = new Set();
@@ -109,7 +109,7 @@ async function buildExport({ huntIds, format = 'xlsx', filters = {} }) {
       if (r.maps_url) link.value = { text: 'open in maps', hyperlink: r.maps_url };
     }
     ws.addRow([]);
-    const info = ws.addRow([`${hRows.length} places — query: "${hunt.query}" — exported ${now.toLocaleString()}`]);
+    const info = ws.addRow([`${hRows.length} places · query: "${hunt.query}" · exported ${now.toLocaleString()}`]);
     info.font = { italic: true, color: { argb: 'FF6B7280' } };
   }
 

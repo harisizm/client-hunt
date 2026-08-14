@@ -1,10 +1,11 @@
 @echo off
-title Web 7 Labs - Hostel Hunter
-cd /d "%~dp0hostel-hunter"
+title Client Hunt - Automated Lead Finder
+cd /d "%~dp0client-hunt"
 echo.
-echo   Web 7 Labs - Hostel Hunter is starting...
+echo   Client Hunt is starting...
 echo   Your browser will open automatically. Keep this black window open while working.
 echo   When you are done, just close this window - everything is saved automatically.
 echo.
 node server.js
 pause
+

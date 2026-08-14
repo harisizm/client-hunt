@@ -1,4 +1,4 @@
-// Hostel Hunter front-end: renders state, listens to SSE, sends commands.
+// Client Hunt front-end: renders state, listens to SSE, sends commands.
 const $ = s => document.querySelector(s);
 
 let hunts = [];
@@ -16,26 +16,26 @@ function statusChip(s) {
     paused: 'paused', done: 'finished', cancelled: 'stopped',
     captcha: 'needs a check', error: 'problem',
   };
-  // hover text in plain words — what the status means and what to do about it
+  // hover text in plain words: what the status means and what to do about it
   const tips = {
-    queued: 'Waiting its turn — searches run one at a time so Google stays happy.',
+    queued: 'Waiting its turn: searches run one at a time so Google stays happy.',
     discovering: 'Searching the map and saving every place it finds.',
-    ready: 'Places found — collecting their details is next.',
+    ready: 'Places found: collecting their details is next.',
     fetching: 'Opening each place and saving its phone, address and rating.',
-    stopping: 'Finishing the current step safely, then it stops — a few seconds.',
-    pausing: 'Finishing the current step safely, then it pauses — a few seconds.',
-    paused: 'Stopped half-way. Nothing is lost — press Continue and it picks up exactly where it left off.',
-    done: 'All finished — ready to download.',
-    cancelled: 'Stopped by you. Everything collected so far is saved — press Continue to finish it.',
-    captcha: 'Google wants a quick human check — click “Fix it now”.',
-    error: 'Something went wrong. Nothing was lost — press Continue to try again.',
+    stopping: 'Finishing the current step safely, then it stops in a few seconds.',
+    pausing: 'Finishing the current step safely, then it pauses in a few seconds.',
+    paused: 'Stopped half-way. Nothing is lost: press Continue and it picks up exactly where it left off.',
+    done: 'All finished: ready to download.',
+    cancelled: 'Stopped by you. Everything collected so far is saved: press Continue to finish it.',
+    captcha: 'Google wants a quick human check: click "Fix it now".',
+    error: 'Something went wrong. Nothing was lost: press Continue to try again.',
   };
   return `<span class="status-chip st-${s}" data-tip="${tips[s] || ''}">${labels[s] || s}</span>`;
 }
 
 // ---------- hover popups ----------
 // One floating card for every element with data-tip. It is position:fixed and
-// placed by hand, so it shows above everything — including table headers and
+// placed by hand, so it shows above everything, including table headers and
 // status chips inside the scrolling table, where a pure-CSS popup gets clipped.
 const tipEl = document.createElement('div');
 tipEl.id = 'tooltip';
@@ -95,7 +95,7 @@ function renderActive() {
     <p class="times">${times}</p>`;
   if (h.status === 'done') {
     const pending = h.total_found - h.fetched_count;
-    body += `<p class="done-note">✔ ${h.fetched_count} places saved — nothing lost.${pending > 0 ? ` ${pending} more can still be collected — press Continue.` : ' Ready to download.'}</p>`;
+    body += `<p class="done-note">✔ ${h.fetched_count} places saved: nothing lost.${pending > 0 ? ` ${pending} more can still be collected: press Continue.` : ' Ready to download.'}</p>`;
   }
 
   const btns = [];
@@ -121,7 +121,7 @@ function renderActive() {
   panel.innerHTML = body;
 
   $('#captchaBanner').classList.toggle('hidden', !hunts.some(x => x.status === 'captcha'));
-  // a new search is never blocked any more — it just joins the queue
+  // a new search is never blocked any more: it just joins the queue
   const waiting = hunts.filter(x => x.status === 'queued').length;
   const badge = $('#queueBadge');
   badge.classList.toggle('hidden', waiting === 0);
@@ -142,29 +142,29 @@ function renderTable() {
     if (h.status === 'queued') return `<tr class="row-queued">
       <td><input type="checkbox" class="huntPick" value="${h.id}" ${picked.has(String(h.id)) ? 'checked' : ''}></td>
       <td>${h.id}</td>
-      <td title="${esc(h.query)}"><b>${esc(h.keyword)}</b> — ${esc(label || h.query)}</td>
+      <td title="${esc(h.query)}"><b>${esc(h.keyword)}</b> · ${esc(label || h.query)}</td>
       <td>${statusChip(h.status)}</td>
-      <td class="muted">—</td><td class="muted">—</td>
+      <td class="muted">-</td><td class="muted">-</td>
       <td><span class="t-amber">in queue</span></td>
       <td class="muted">${esc((h.created_at || '').slice(0, 16))}</td>
       <td class="row-actions"><button class="btn btn-sm" data-tip="Take this search out of the queue." onclick="cmd(${h.id},'cancel')">✖</button><button class="btn btn-sm btn-del" data-tip="Delete this search." onclick="delHunt(${h.id}, ${h.fetched_count})">🗑</button></td>
     </tr>`;
     const took = h.finished_at
       ? `<span class="t-green">${fmtDur(workMs(h))}</span>`
-      : running ? `<span class="t-accent">running…</span>` : '<span class="muted">—</span>';
+      : running ? `<span class="t-accent">running…</span>` : '<span class="muted">-</span>';
     const savedCell = h.fetched_count === 0 ? `<span class="muted">0</span>`
       : pending > 0 ? `<span class="t-amber">${h.fetched_count}</span> <span class="muted">(${pending} left)</span>`
       : `<span class="t-green">${h.fetched_count}</span>`;
     return `<tr>
       <td><input type="checkbox" class="huntPick" value="${h.id}" ${picked.has(String(h.id)) ? 'checked' : ''}></td>
       <td>${h.id}</td>
-      <td title="${esc(h.query)}"><b>${esc(h.keyword)}</b> — ${esc(label || h.query)}</td>
+      <td title="${esc(h.query)}"><b>${esc(h.keyword)}</b> · ${esc(label || h.query)}</td>
       <td>${statusChip(h.status)}</td>
       <td class="t-accent">${h.total_found}</td>
       <td>${savedCell}</td>
       <td>${took}</td>
       <td class="muted">${esc((h.created_at || '').slice(0, 16))}</td>
-      <td class="row-actions">${h.fetched_count > 0 ? `<button class="btn btn-sm btn-dl" data-tip="Download this search as an Excel file." onclick="rowExport(${h.id})">⬇ Excel</button>` : ''}${canResume ? `<button class="btn btn-sm btn-go" data-tip="Continue this search from the exact point it stopped — nothing is collected twice." onclick="cmd(${h.id},'resume',true)">▶ ${h.status === 'ready' ? 'Get details' : 'Continue'}</button>` : ''}<button class="btn btn-sm btn-del" data-tip="Delete this search and its collected places." onclick="delHunt(${h.id}, ${h.fetched_count})">🗑</button></td>
+      <td class="row-actions">${h.fetched_count > 0 ? `<button class="btn btn-sm btn-dl" data-tip="Download this search as an Excel file." onclick="rowExport(${h.id})">⬇ Excel</button>` : ''}${canResume ? `<button class="btn btn-sm btn-go" data-tip="Continue this search from the exact point it stopped: nothing is collected twice." onclick="cmd(${h.id},'resume',true)">▶ ${h.status === 'ready' ? 'Get details' : 'Continue'}</button>` : ''}<button class="btn btn-sm btn-del" data-tip="Delete this search and its collected places." onclick="delHunt(${h.id}, ${h.fetched_count})">🗑</button></td>
     </tr>`;
   }).join('');
 }
@@ -225,7 +225,7 @@ function logClass(level, message) {
   if (level === 'error') return 'log-error';
   if (/verification|captcha/i.test(message)) return 'log-error';
   if (level === 'warn') return 'log-warn';
-  if (/^(Stopping|Pausing) —/.test(message)) return 'log-warn';
+  if (/^(Stopping|Pausing)/.test(message)) return 'log-warn';
   if (/^✗/.test(message)) return 'log-error';
   if (/^✓/.test(message)) return /possible duplicate/i.test(message) ? 'log-dup' : 'log-place';
   if (/^\+\d+ new place/.test(message)) return 'log-new';
@@ -252,7 +252,7 @@ function addLog({ level, message, ts }) {
 async function refresh() {
   const r = await fetch('/api/state').then(r => r.json());
   hunts = r.hunts; activeHuntId = r.activeHuntId; masterCount = r.masterCount;
-  $('#masterInfo').textContent = masterCount ? `${masterCount} known numbers — repeats get marked automatically` : '';
+  $('#masterInfo').textContent = masterCount ? `${masterCount} known numbers: repeats get marked automatically` : '';
   renderActive(); renderTable(); renderAreaDropdowns(); updateBulkBar();
   if (!window._logsLoaded) {
     window._logsLoaded = true;
@@ -298,7 +298,7 @@ window.discardHunt = async id => {
   const running = h && RUNNING.includes(h.status);
   const msg = `Discard this search?\n\n` +
     (running ? `It will be stopped, and ` : '') +
-    (n > 0 ? `all its progress — ${n} places collected so far — will be deleted, along with any Excel files the app made from it.`
+    (n > 0 ? `all its progress (${n} places collected so far) will be deleted, along with any Excel files the app made from it.`
            : `it will be removed completely.`) +
     `\nCopies already saved in your Downloads folder are safe.`;
   if (!await appConfirm(msg, { okText: 'Yes, discard it' })) return;
@@ -342,13 +342,13 @@ async function doExport(ids, ignoreAreaFilters = false) {
   let what;
   if (ids.length === 1) {
     const h = hunts.find(x => x.id === ids[0]);
-    what = h ? `${h.keyword} — ${[h.subarea, h.area, h.city].filter(Boolean).join(', ') || h.query}` : 'this search';
+    what = h ? `${h.keyword} (${[h.subarea, h.area, h.city].filter(Boolean).join(', ') || h.query})` : 'this search';
   } else if (ids.length) {
     what = `${ids.length} selected searches`;
   } else {
     what = 'all your searches';
-    if (subarea) what += ` — ${subarea} only`;
-    else if (area) what += ` — ${area} only`;
+    if (subarea) what += ` (${subarea} only)`;
+    else if (area) what += ` (${area} only)`;
   }
   btn.disabled = true;
   out.innerHTML = `<span class="spinner"></span> Preparing your file (${esc(what)})…`;
@@ -373,13 +373,13 @@ async function doExport(ids, ignoreAreaFilters = false) {
   try {
     const r = await fetch('/api/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
     if (r.error) { out.textContent = r.error; return; }
-    if (!r.count) { out.textContent = 'No places match these filters — try removing some filters.'; return; }
+    if (!r.count) { out.textContent = 'No places match these filters: try removing some filters.'; return; }
     const a = document.createElement('a');
     a.href = r.url; a.download = r.name;
     document.body.appendChild(a); a.click(); a.remove();
-    out.innerHTML = `✔ Downloading <b>${esc(r.name)}</b> (${r.count} places) — check your browser's download bar. <a href="${r.url}">download again</a>`;
+    out.innerHTML = `✔ Downloading <b>${esc(r.name)}</b> (${r.count} places): check your browser's download bar. <a href="${r.url}">download again</a>`;
   } catch (e) {
-    out.textContent = 'Something went wrong — please try again.';
+    out.textContent = 'Something went wrong: please try again.';
   } finally {
     btn.disabled = false;
     exporting = false;
@@ -392,7 +392,7 @@ window.quickExport = id => doExport([id], true);
 const isBusy = () => hunts.some(x => RUNNING.includes(x.status));
 
 window.cmd = async (id, action, all) => {
-  // only one search may talk to Google at a time — parallel runs risk a ban
+  // only one search may talk to Google at a time: parallel runs risk a ban
   if (['resume', 'fetch'].includes(action) && isBusy()) {
     const ok = await showModal(
       'A search is already running.\n\nOnly one can run at a time, otherwise Google may block us.\nShall I add this one to the queue instead? It will start automatically when the current one finishes.',
@@ -413,7 +413,7 @@ $('#huntForm').addEventListener('submit', async e => {
   const body = {
     keyword: f.get('keyword'), city: f.get('city'), area: f.get('area'), subarea: f.get('subarea'),
     maxResults: Number(f.get('maxResults')) || 0, batchSize: Number(f.get('batchSize')) || 10,
-    deep: true, // deep search is always on — no reason for the team to ever skip it
+    deep: true, // deep search is always on: no reason to skip it
     target: Number(f.get('target')) || 0,
   };
   btn.disabled = true;
@@ -442,7 +442,7 @@ $('#huntsTable').addEventListener('change', e => {
 
 $('#btnDownloadSel').addEventListener('click', async () => {
   const ids = [...document.querySelectorAll('.huntPick:checked')];
-  if (!ids.length) { await appInfo('Tick at least one search first — or just press the big Download Excel button on the right to get everything.'); return; }
+  if (!ids.length) { await appInfo('Tick at least one search first or just press the big Download Excel button on the right to get everything.'); return; }
   $('#btnExport').click();
   $('#btnExport').scrollIntoView({ behavior: 'smooth', block: 'center' });
 });
@@ -451,13 +451,13 @@ $('#btnDownloadAll').addEventListener('click', () => doExport([])); // [] = ever
 
 $('#btnResumeSel').addEventListener('click', async () => {
   const btn = $('#btnResumeSel');
-  if (btn.disabled) return; // the one-by-one loop below runs long — never twice
+  if (btn.disabled) return; // the one-by-one loop below runs long: never twice
   const ids = [...document.querySelectorAll('.huntPick:checked')].map(c => Number(c.value));
   if (!ids.length) { await appInfo('Tick at least one search first (use the top checkbox to select all).'); return; }
   const todo = hunts.filter(h => ids.includes(h.id) &&
     (h.total_found - h.fetched_count > 0 || h.status === 'ready' || !h.discovery_done) &&
     !RUNNING.includes(h.status));
-  if (!todo.length) { await appInfo('The selected searches are already complete — nothing left to collect.'); return; }
+  if (!todo.length) { await appInfo('The selected searches are already complete: nothing left to collect.'); return; }
   addLog({ level: 'info', message: `Continuing ${todo.length} search${todo.length > 1 ? 'es' : ''} one by one…`, ts: new Date().toLocaleTimeString() });
   btn.disabled = true;
   btn.textContent = '⏳ Collecting…';
@@ -465,11 +465,11 @@ $('#btnResumeSel').addEventListener('click', async () => {
     for (const h of todo) {
       const r = await fetch(`/api/hunts/${h.id}/resume`, { method: 'POST' }).then(r => r.json()).catch(() => ({ error: 'failed' }));
       if (r.error) { addLog({ level: 'warn', message: `Search #${h.id}: ${r.error}`, ts: new Date().toLocaleTimeString() }); continue; }
-      // only one search can talk to Google at a time — wait for this one to finish
+      // only one search can talk to Google at a time: wait for this one to finish
       await new Promise(res => {
         const t = setInterval(async () => {
           const s = await fetch('/api/state').then(r => r.json()).catch(() => null);
-          const cur = s && s.hunts.find(x => x.id === h.id);
+          const cur = s && s.hunts.find(x => x.id === id);
           if (!cur || !RUNNING.includes(cur.status)) { clearInterval(t); res(); }
         }, 3000);
       });
@@ -500,7 +500,7 @@ $('#btnDeleteSel').addEventListener('click', async () => {
       if (r.error) problems.push(`#${id}: ${r.error}`);
     }
     $('#pickAll').checked = false;
-    if (problems.length) addLog({ level: 'warn', message: `Some could not be deleted — ${problems.join(' · ')}`, ts: new Date().toLocaleTimeString() });
+    if (problems.length) addLog({ level: 'warn', message: `Some could not be deleted: ${problems.join(' · ')}`, ts: new Date().toLocaleTimeString() });
     else addLog({ level: 'info', message: `Deleted ${ids.length} search${ids.length > 1 ? 'es' : ''}.`, ts: new Date().toLocaleTimeString() });
   } finally {
     btn.disabled = false;

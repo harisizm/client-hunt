@@ -1,4 +1,4 @@
-// Hostel Hunter — local web server (no framework, plain node:http).
+// Client Hunt - local web server (no framework, plain node:http).
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -71,7 +71,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/hunts' && req.method === 'POST') {
       const b = await readBody(req);
-      const keyword = (b.keyword || 'hostels').trim();
+      const keyword = (b.keyword || 'business').trim();
       const city = (b.city || '').trim(), area = (b.area || '').trim(), subarea = (b.subarea || '').trim();
       const locality = [subarea, area, city].filter(Boolean).join(' ');
       if (!locality) return json(res, 400, { error: 'Enter at least one of city / area / sub-area.' });
@@ -99,9 +99,9 @@ const server = http.createServer(async (req, res) => {
       if (action === 'delete') {
         engine.dequeue(id); // drop it from the waiting list first
         if (engine.busy && engine.activeHuntId === id) {
-          // a captcha-paused search only *holds* the engine — safe to release and delete
+          // a captcha-paused search only holds the engine: safe to release and delete
           if (hunt.status === 'captcha') engine.activeHuntId = null;
-          else return json(res, 409, { error: 'This search is still running — press Stop first, then delete it.' });
+          else return json(res, 409, { error: 'This search is still running: press Stop first, then delete it.' });
         }
         // Excel/CSV files the app made from this search go with it
         for (const ex of store.exportsInvolvingHunt(id)) {
@@ -131,7 +131,7 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       let huntIds = (b.huntIds || []).map(Number).filter(Boolean);
       if (!huntIds.length) huntIds = store.listHunts().map(h => h.id); // nothing ticked = everything
-      if (!huntIds.length) return json(res, 400, { error: 'Nothing saved yet — run a search first.' });
+      if (!huntIds.length) return json(res, 400, { error: 'Nothing saved yet: run a search first.' });
       const out = await buildExport({ huntIds, format: b.format || 'xlsx', filters: b.filters || {} });
       return json(res, 200, { name: out.name, count: out.count, url: '/exports/' + encodeURIComponent(out.name) });
     }
@@ -161,7 +161,7 @@ const server = http.createServer(async (req, res) => {
 
 server.on('error', e => {
   if (e.code === 'EADDRINUSE') {
-    console.log(`\n  Hostel Hunter is ALREADY running — just open http://localhost:${PORT} in your browser.\n`);
+    console.log(`\n  Client Hunt is ALREADY running: just open http://localhost:${PORT} in your browser.\n`);
     process.exit(0);
   }
   throw e;
@@ -170,12 +170,12 @@ server.on('error', e => {
 loadMasterPhones();
 server.listen(PORT, () => {
   const addr = `http://localhost:${PORT}`;
-  console.log(`\n  Web 7 Labs — Hostel Hunter running at ${addr}`);
-  console.log(`  To stop it, simply close this window — everything is saved automatically.\n`);
+  console.log(`\n  Client Hunt running at ${addr}`);
+  console.log(`  To stop it, simply close this window: everything is saved automatically.\n`);
   if (cfg.AUTO_OPEN_BROWSER && !process.env.NO_OPEN) execFile('cmd', ['/c', 'start', '', addr], () => {});
 });
 
-// Closing the black window (CTRL_CLOSE_EVENT → SIGHUP), Ctrl+C (SIGINT) or a
+// Closing the black window (CTRL_CLOSE_EVENT -> SIGHUP), Ctrl+C (SIGINT) or a
 // kill (SIGTERM/SIGBREAK) all land here: mark the running hunt paused, close
 // the browser and database, and free the port. Windows gives a console app
 // only ~5 seconds after the X is clicked, so this stays quick.
@@ -183,7 +183,7 @@ let shuttingDown = false;
 async function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
-  console.log('\n  Closing — saving everything…');
+  console.log('\n  Closing: saving everything…');
   // backstop: if any close step hangs, exit anyway instead of lingering as a
   // ghost process that keeps the port taken
   setTimeout(() => process.exit(0), 4000).unref();
@@ -195,12 +195,13 @@ async function shutdown() {
 }
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK']) process.on(sig, shutdown);
 // Windows Terminal (the default "black window" on Windows 11) does not always
-// deliver the close signal to Node — but closing the window always severs
+// deliver the close signal to Node: but closing the window always severs
 // stdin, so a dead stdin is treated as the same "please shut down" request.
 if (process.stdin.isTTY) {
   process.stdin.resume();
   process.stdin.on('end', shutdown);
   process.stdin.on('error', shutdown);
 }
-// the console can die before we do — a failing log write must never crash us
+// the console can die before we do: a failing log write must never crash us
 process.stdout.on('error', () => {});
+

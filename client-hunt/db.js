@@ -1,4 +1,4 @@
-// SQLite persistence via Node's built-in driver — no native deps to compile.
+// SQLite persistence via Node's built-in driver: no native deps to compile.
 const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const fs = require('fs');
@@ -71,7 +71,7 @@ try {
 } catch {}
 try { db.exec('ALTER TABLE hunts ADD COLUMN run_started_at TEXT'); } catch {}
 // deep-search progress: which extra search is next, how many in a row found
-// nothing, and the map centre — so a shutdown mid-deep-search resumes exactly
+// nothing, and the map centre: so a shutdown mid-deep-search resumes exactly
 // where it stopped instead of starting the passes over
 try { db.exec('ALTER TABLE hunts ADD COLUMN deep_pass INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE hunts ADD COLUMN deep_dry INTEGER DEFAULT 0'); } catch {}

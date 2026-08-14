@@ -1,5 +1,5 @@
 // Hunt engine: drives a persistent headless Chromium over Google Maps.
-// One hunt runs at a time (deliberate — keeps traffic human-like).
+// One hunt runs at a time (deliberate: keeps traffic human-like).
 const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
@@ -73,7 +73,7 @@ class HuntEngine {
     const h = store.getHunt(huntId);
     if (h && this.activeHuntId !== huntId) {
       store.setHuntStatus(huntId, 'queued');
-      if (this.busy) this.log(huntId, 'info', `Added to the queue — it will start when the current search finishes (${this.queue.length} waiting).`);
+      if (this.busy) this.log(huntId, 'info', `Added to the queue: it will start when the current search finishes (${this.queue.length} waiting).`);
       this.pushHunt(huntId);
     }
     this.drain();
@@ -101,12 +101,12 @@ class HuntEngine {
     this.queue = this.queue.filter(id => id !== huntId);
   }
 
-  // full run: discover, then roll straight into fetching — no extra click
+  // full run: discover, then roll straight into fetching (no extra click)
   async run(huntId) {
     await this.discover(huntId);
     const h = store.getHunt(huntId);
     if (h && h.status === 'ready' && store.pendingPlaces(huntId, 1).length) {
-      this.log(huntId, 'info', `Google found ${h.total_found} places — fetching details automatically…`);
+      this.log(huntId, 'info', `Google found ${h.total_found} places: fetching details automatically…`);
       await this.fetchDetails(huntId);
     }
   }
@@ -140,13 +140,13 @@ class HuntEngine {
       // already saved) and continues from the exact pass it stopped at
       const resuming = hunt.deep && (hunt.deep_pass | 0) > 0;
       if (resuming) {
-        this.log(huntId, 'info', `Continuing the deep search from where it stopped — ${store.countPlaces(huntId)} places already found.`);
+        this.log(huntId, 'info', `Continuing the deep search from where it stopped: ${store.countPlaces(huntId)} places already found.`);
       } else {
-        this.log(huntId, 'info', `Starting hunt: "${hunt.query}" — opening browser…`);
+        this.log(huntId, 'info', `Starting hunt: "${hunt.query}": opening browser…`);
         const url = 'https://www.google.com/maps/search/' + encodeURIComponent(hunt.query) + '?hl=en';
         this.log(huntId, 'info', 'Opening Google Maps search…');
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-        this.log(huntId, 'info', 'Page loaded — waiting for the results list…');
+        this.log(huntId, 'info', 'Page loaded: waiting for the results list…');
         // consent button rarely appears; click it if it does but never wait for it
         page.locator('button[aria-label*="Accept"], form[action*="consent"] button').first()
           .click({ timeout: 4000 }).catch(() => {});
@@ -170,7 +170,7 @@ class HuntEngine {
           return;
         }
 
-        this.log(huntId, 'info', 'Results list found — scrolling to load every place…');
+        this.log(huntId, 'info', 'Results list found: scrolling to load every place…');
         await this.scrapeFeed(page, huntId, saveBatch);
       }
 
@@ -188,7 +188,7 @@ class HuntEngine {
           if (Number.isFinite(lat) && Number.isFinite(lng)) store.setDeepProgress(huntId, { lat, lng });
         }
         const variants = this.buildVariantPasses(hunt);
-        if (!Number.isFinite(lat)) this.log(huntId, 'warn', 'Could not work out the map position — only different wordings will be tried.');
+        if (!Number.isFinite(lat)) this.log(huntId, 'warn', 'Could not work out the map position: only different wordings will be tried.');
 
         // no fixed number of passes: rings of map tiles spiral outwards for as
         // long as they keep producing new places, and stop only after
@@ -197,13 +197,13 @@ class HuntEngine {
         let dry = hunt.deep_dry | 0;
         for (let i = hunt.deep_pass | 0; !this.stopRequested && !this.pauseRequested; i++) {
           const pass = this.deepPassAt(variants, hunt, lat, lng, i);
-          if (!pass) break; // no map position → nothing beyond the wording variants
+          if (!pass) break; // no map position: nothing beyond the wording variants
           const have = store.countPlaces(huntId);
           if (target && have >= target) {
-            this.log(huntId, 'info', `Reached your target of ${target} places — stopping the deep search here.`);
+            this.log(huntId, 'info', `Reached your target of ${target} places: stopping the deep search here.`);
             break;
           }
-          this.log(huntId, 'info', `Looking deeper (search ${i + 1}) — ${have} found so far…`);
+          this.log(huntId, 'info', `Looking deeper (search ${i + 1}): ${have} found so far…`);
           let fresh = 0;
           try {
             await page.goto(pass.url, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -219,13 +219,13 @@ class HuntEngine {
             // straight to a single place) simply times out and is skipped
             fresh = await this.scrapeFeed(page, huntId, saveBatch, 15000);
           } catch {
-            this.log(huntId, 'warn', `That search showed no list — skipped.`);
+            this.log(huntId, 'warn', `That search showed no list: skipped.`);
           }
           if (fresh > 0) { dry = 0; this.log(huntId, 'info', `+${fresh} new place${fresh > 1 ? 's' : ''} (${store.countPlaces(huntId)} total)`); }
           else dry++;
           store.setDeepProgress(huntId, { pass: i + 1, dry }); // survives a shutdown
           if (dry >= cfg.DEEP_STOP_AFTER_EMPTY) {
-            this.log(huntId, 'info', `Nothing new in the last ${dry} searches — that is everything Google will show for this area.`);
+            this.log(huntId, 'info', `Nothing new in the last ${dry} searches: that is everything Google will show for this area.`);
             break;
           }
           await sleep(rand([800, 1500]));
@@ -237,27 +237,27 @@ class HuntEngine {
       store.setHuntTotals(huntId, { totalFound: total });
       if (this.stopRequested) {
         store.setHuntStatus(huntId, 'cancelled');
-        this.log(huntId, 'warn', `Search stopped — the ${total} places found are kept safe. Resume continues from this exact point.`);
+        this.log(huntId, 'warn', `Search stopped: the ${total} places found are kept safe. Resume continues from this exact point.`);
       } else if (this.pauseRequested) {
         store.setHuntStatus(huntId, 'paused');
-        this.log(huntId, 'info', `Search paused — the ${total} places found are kept safe. Resume continues from this exact point.`);
+        this.log(huntId, 'info', `Search paused: the ${total} places found are kept safe. Resume continues from this exact point.`);
       } else {
         store.setDiscoveryDone(huntId, true);
         store.setHuntStatus(huntId, 'ready');
         const tgt = hunt.target | 0;
         this.log(huntId, 'info', `Search finished: ${total} different places found for this area.` +
-          (tgt && total < tgt ? ` (You expected ${tgt} — Google does not list more than this for the words used. Try a smaller sub-area, e.g. block by block.)` : ''));
+          (tgt && total < tgt ? ` (You expected ${tgt}: Google does not list more than this for the words used. Try a smaller sub-area, e.g. block by block.)` : ''));
       }
     } catch (e) {
       store.setHuntStatus(huntId, 'error', e.message.split('\n')[0]);
-      this.log(huntId, 'error', `Discovery failed: ${e.message.split('\n')[0]} — everything found so far is saved.`);
+      this.log(huntId, 'error', `Discovery failed: ${e.message.split('\n')[0]}: everything found so far is saved.`);
     } finally {
       if (store.getHunt(huntId)?.status !== 'captcha') this.activeHuntId = null;
       this.pushHunt(huntId);
     }
   }
 
-  // Wording variants for a deep hunt — the cheapest-and-richest extra searches,
+  // Wording variants for a deep hunt: the cheapest-and-richest extra searches,
   // tried before the map tiles.
   buildVariantPasses(hunt) {
     const passes = [];
@@ -296,7 +296,7 @@ class HuntEngine {
   }
 
   // scrolls one results feed to its true end, handing every ~10 freshly loaded
-  // cards to saveBatch as they appear — so a shutdown mid-scroll keeps
+  // cards to saveBatch as they appear: so a shutdown mid-scroll keeps
   // everything already seen. Returns how many places in this feed were new.
   async scrapeFeed(page, huntId, saveBatch, waitMs = 30000) {
     const extract = () => page.locator('a.hfpxzc').evaluateAll(links =>
@@ -330,9 +330,9 @@ class HuntEngine {
       if (count >= savedUpTo + 10) { added += saveBatch(await extract()); savedUpTo = count; }
       const end = await page.locator('div[role="feed"]').evaluate(el => /reached the end of the list/i.test(el.innerText)).catch(() => false);
       if (end) break;
-      // Google sometimes takes a while to fetch the next page — judge by time
+      // Google sometimes takes a while to fetch the next page: judge by time
       // without growth, not by scroll attempts
-      if (Date.now() - lastGrowth > cfg.FEED_STALL_TIMEOUT_MS) { this.log(huntId, 'warn', 'List stopped growing — taking what Google gave.'); break; }
+      if (Date.now() - lastGrowth > cfg.FEED_STALL_TIMEOUT_MS) { this.log(huntId, 'warn', 'List stopped growing: taking what Google gave.'); break; }
       await page.locator('div[role="feed"]').evaluate(el => { el.scrollTop = el.scrollHeight; }).catch(() => {});
       await sleep(rand([cfg.SCROLL_STEP_MIN_MS, cfg.SCROLL_STEP_MAX_MS]));
     }
@@ -354,12 +354,12 @@ class HuntEngine {
     const copied = this.fastCopyKnown(huntId);
     if (copied) {
       store.setHuntTotals(huntId, { fetchedCount: store.fetchedCount(huntId) });
-      this.log(huntId, 'info', `${copied} places were already saved from earlier searches — copied instantly, no waiting.`);
+      this.log(huntId, 'info', `${copied} places were already saved from earlier searches: copied instantly, no waiting.`);
       this.pushHunt(huntId);
     }
     if (!store.pendingPlaces(huntId, 1).length) {
       store.setHuntStatus(huntId, 'done');
-      this.log(huntId, 'info', `This area is already fully saved — ${store.fetchedCount(huntId)} places ready. Click "Download Excel" to get the file.`);
+      this.log(huntId, 'info', `This area is already fully saved: ${store.fetchedCount(huntId)} places ready. Click "Download Excel" to get the file.`);
       this.activeHuntId = null;
       this.pushHunt(huntId);
       return;
@@ -376,19 +376,19 @@ class HuntEngine {
       let inBatch = 0;
 
       while (true) {
-        if (this.stopRequested) { store.setHuntStatus(huntId, 'cancelled'); this.log(huntId, 'warn', 'Stopped — everything collected so far is saved.'); break; }
-        if (this.pauseRequested) { store.setHuntStatus(huntId, 'paused'); this.log(huntId, 'info', 'Paused — resume anytime, nothing is lost.'); break; }
+        if (this.stopRequested) { store.setHuntStatus(huntId, 'cancelled'); this.log(huntId, 'warn', 'Stopped: everything collected so far is saved.'); break; }
+        if (this.pauseRequested) { store.setHuntStatus(huntId, 'paused'); this.log(huntId, 'info', 'Paused: resume anytime, nothing is lost.'); break; }
 
         const already = store.fetchedCount(huntId);
         if (limit && already >= limit) {
           store.setHuntStatus(huntId, 'done');
-          this.log(huntId, 'warn', `Stopped because this search is set to "collect only ${hunt.max_results} at a time". ${already} saved, ${store.getHunt(huntId).total_found - already} still to go — press "Get all the rest" to finish them in one go.`);
+          this.log(huntId, 'warn', `Stopped because this search is set to "collect only ${hunt.max_results} at a time". ${already} saved, ${store.getHunt(huntId).total_found - already} still to go: press "Get all the rest" to finish them in one go.`);
           break;
         }
         const [next] = store.pendingPlaces(huntId, 1);
         if (!next) {
           store.setHuntStatus(huntId, 'done');
-          this.log(huntId, 'info', `Hunt complete: ${already} places fetched & saved to the database — nothing lost. Tick the hunt below and press Export.`);
+          this.log(huntId, 'info', `Hunt complete: ${already} places fetched & saved to the database: nothing lost. Tick the hunt below and press Export.`);
           break;
         }
 
@@ -433,7 +433,7 @@ class HuntEngine {
           const dup = this.dupCheck(next.id, d, huntId);
           d.dupFlag = dup.flag; d.dupReason = dup.reason;
 
-          store.savePlaceDetail(next.id, d);   // live save — survives crash/cancel
+          store.savePlaceDetail(next.id, d);   // live save: survives crash/cancel
           const nFetched = store.fetchedCount(huntId);
           store.setHuntTotals(huntId, { fetchedCount: nFetched });
           this.emit('place', { huntId, place: { ...d, id: next.id }, fetched: nFetched, total: store.getHunt(huntId).total_found });
@@ -447,7 +447,7 @@ class HuntEngine {
         if (inBatch >= batchSize) {
           inBatch = 0;
           const cool = rand(BATCH_COOLDOWN_MS);
-          this.log(huntId, 'info', `${batchSize} places done — taking a short ${Math.round(cool / 1000)}s rest so Google stays happy…`);
+          this.log(huntId, 'info', `${batchSize} places done: taking a short ${Math.round(cool / 1000)}s rest so Google stays happy…`);
           this.emit('cooldown', { huntId, seconds: Math.round(cool / 1000) });
           await this.interruptibleSleep(cool);
         } else {
@@ -457,7 +457,7 @@ class HuntEngine {
       await page.close().catch(() => {});
     } catch (e) {
       store.setHuntStatus(huntId, 'error', e.message.split('\n')[0]);
-      this.log(huntId, 'error', `Fetch crashed: ${e.message.split('\n')[0]} — everything fetched so far is saved.`);
+      this.log(huntId, 'error', `Fetch crashed: ${e.message.split('\n')[0]}: everything fetched so far is saved.`);
     } finally {
       if (store.getHunt(huntId).status !== 'captcha') this.activeHuntId = null;
       this.pushHunt(huntId);
@@ -515,7 +515,7 @@ class HuntEngine {
     this.captchaUrl = url;
     store.setHuntStatus(huntId, 'captcha');
     this.pushHunt(huntId);
-    this.log(huntId, 'error', `Google showed a verification (captcha). Click "Fix now" on this page — or wait, I will retry automatically in ${cfg.CAPTCHA_RETRY_MINUTES} minutes.`);
+    this.log(huntId, 'error', `Google showed a verification (captcha). Click "Fix now" on this page or wait, I will retry automatically in ${cfg.CAPTCHA_RETRY_MINUTES} minutes.`);
     this.emit('captcha', { huntId });
     await this.closeBrowser();
     clearTimeout(this._retryTimer);
@@ -531,7 +531,7 @@ class HuntEngine {
 
   // opens a VISIBLE window on the captcha for a human to click through
   async openSolverWindow(huntId) {
-    // a second click must not open a second window — two browsers on the same
+    // a second click must not open a second window: two browsers on the same
     // profile fight over its lock and crash (the flag also covers the moment
     // before the window handle exists)
     if (this.solverCtx || this._solverOpening) return;
@@ -548,7 +548,7 @@ class HuntEngine {
       });
       const page = await this.solverCtx.newPage();
       await page.goto(this.captchaUrl || 'https://www.google.com/maps?hl=en', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
-      this.log(huntId, 'info', 'Solver window opened — complete the verification there, the hunt resumes by itself.');
+      this.log(huntId, 'info', 'Solver window opened: complete the verification there, the hunt resumes by itself.');
       // poll until the block is gone, then auto-close and resume
       for (let i = 0; i < 150; i++) {
         await sleep(2000);
@@ -557,7 +557,7 @@ class HuntEngine {
           const u = page.url();
           const body = await page.evaluate(() => document.body.innerText.slice(0, 4000));
           cleared = !this.isBlockedPage(u, body);
-        } catch { break; } // window closed by user — treat as attempt done
+        } catch { break; } // window closed by user: treat as attempt done
         if (cleared) break;
       }
     } finally {
@@ -580,13 +580,13 @@ class HuntEngine {
   // -------- controls --------
   // the flags are only noticed at the next safe checkpoint (between places /
   // scroll steps), so flip the status to a transient "stopping…"/"pausing…"
-  // right away — the user sees the click landed the same instant
+  // right away: the user sees the click landed the same instant
   cancel() {
     const id = this.activeHuntId;
     const h = id && store.getHunt(id);
     if (h && ['discovering', 'fetching'].includes(h.status)) {
       store.setHuntStatus(id, 'stopping');
-      this.log(id, 'warn', 'Stopping — letting the current step finish safely, a few seconds…');
+      this.log(id, 'warn', 'Stopping: letting the current step finish safely, a few seconds…');
       this.pushHunt(id);
     }
     this.stopRequested = true;
@@ -596,7 +596,7 @@ class HuntEngine {
     const h = id && store.getHunt(id);
     if (h && ['discovering', 'fetching'].includes(h.status)) {
       store.setHuntStatus(id, 'pausing');
-      this.log(id, 'info', 'Pausing — letting the current step finish safely, a few seconds…');
+      this.log(id, 'info', 'Pausing: letting the current step finish safely, a few seconds…');
       this.pushHunt(id);
     }
     this.pauseRequested = true;

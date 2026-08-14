@@ -1,20 +1,23 @@
 # Dependencies
 node_modules/
 
-# Collected data — real business leads and phone numbers, never publish
+# Collected data: real business leads and phone numbers, never publish
+client-hunt/data/
 hostel-hunter/data/
 *.db
 *.db-wal
 *.db-shm
 
 # Generated Excel/CSV files
+client-hunt/exports/
 hostel-hunter/exports/
 *.xlsx
 *.csv
+~$*.xlsx
 
 # ...except the committed example output
 !samples/
-!samples/*.xlsx
+!samples/sample-export.xlsx
 
 # Local settings (copy .env.example to .env)
 .env
@@ -25,3 +28,4 @@ npm-debug.log*
 Thumbs.db
 desktop.ini
 .DS_Store
+

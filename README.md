@@ -1,13 +1,11 @@
-# Web 7 Labs — Client Hunt (Hostel Hunter)
+# Client Hunt: Automated Lead Generation & Business Discovery
 
-Finds businesses on Google Maps in bulk and exports them to Excel — name, phone,
-address, website, rating, reviews, category — replacing hours of manual
-copy-and-paste for the marketing team.
+Finds businesses and sales prospects on Google Maps in bulk and exports them to Excel: name, phone,
+address, website, rating, reviews, and category, replacing hours of manual copy-and-paste for marketing and sales teams.
 
-Built for hostels in Lahore, but the keyword is free text, so it works for any
-business type in any city.
+Works for any industry, niche, or business type in any city worldwide.
 
-**No Google login. No API key. No paid service. Runs entirely on one laptop.**
+**No Google login. No API key. No paid service. Runs entirely on your computer.**
 
 ![status](https://img.shields.io/badge/platform-Windows-blue) ![status](https://img.shields.io/badge/cost-free-brightgreen)
 
@@ -15,96 +13,66 @@ business type in any city.
 
 ## What it does
 
-1. You type what to look for and where — *hostels · Lahore · Gulberg · C Block*.
-2. It scrolls Google's whole result list, then keeps re-searching the area from
-   different angles (wording variants and ever-widening rings of nearby map
-   positions) for as long as new places keep appearing — it stops only after
-   several searches in a row find nothing new. A single search often triples
-   what one Google query shows.
-3. It opens every place and saves the details to a local database, live — a crash,
-   a stop, or a power cut loses nothing.
-4. You click **Download Excel** and get one sheet per area, ready to work from.
+1. You type what to look for and where (e.g. *digital agencies · London · Soho* or *clinics · New York · Brooklyn*).
+2. It scrolls Google's result list, then deep-searches the target area from
+   different angles (wording variants and expanding rings of map coordinates)
+   as long as new places keep appearing. A single deep search often triples
+   what a single manual query shows.
+3. It opens every place and saves full contact details to a local SQLite database live:
+   a crash, a stop, or a power cut loses nothing.
+4. You click **Download Excel** and get clean, formatted sheets ready to work from.
 
-Real numbers from testing: Johar Town returned **33 places** from a plain Google
-search and **164** with deep search on; Township returned **193**.
+Real numbers from testing: a standard search returned **33 places** while deep search extracted **164 to 190+ qualified leads** in minutes.
 
 ## What you get
 
-📄 **[samples/sample-export.xlsx](samples/sample-export.xlsx)** — a real export,
-trimmed to a few rows per sheet with phone digits masked.
-
-One sheet per area, bold filterable headers, frozen top row, clickable map links,
-and repeats tinted amber:
-
-| City | Area | Name | Phone | Address | Rating | Reviews | Category |
-|---|---|---|---|---|---|---|---|
-| Lahore | Johar Town | THH - Hostel & Hotel Johar Town | 0300XXXXXXX | 120 R2 Johar, Block R2… | 4.5 | 327 | Hostel |
-| Lahore | Johar Town | Lahore Hostel Johar Town | 0313XXXXXXX | House 158, Block D… | 4.1 | 96 | Hostel |
-| Lahore | Township | Firdous Girls Hostel | 0335XXXXXXX | Block 2 Township… | 3.3 | 41 | Hostel |
+📄 **[samples/sample-export.xlsx](samples/sample-export.xlsx)**: sample export with bold filterable headers, frozen top row, clickable map links, and duplicate flags.
 
 Full column list: City · Area · Sub Area · Name · Phone · Email · Address ·
 Website · Rating · Reviews · Category · Duplicate? · Duplicate Reason ·
 Google Maps Link · Fetched At.
 
-Files are named `hostels_johar-town_2026-08-07_6-30-15PM.xlsx` and land in
-`hostel-hunter/exports/` as well as your browser's Downloads folder. CSV is a
-dropdown away.
+Files are named like `digital-agencies_manhattan_2026-08-07_6-30-15PM.xlsx` and land in
+`client-hunt/exports/` as well as your browser's Downloads folder. CSV export is also available.
 
 ## The app
 
-A single white-on-black page: search form on the left, live progress in the
-middle, a colour-coded activity log on the right, and your searches with
+A single responsive page: search form on the left, live progress in the
+middle, a color-coded activity log on the right, and your searches with
 one-click export along the bottom.
-
-```
-┌──────────────────┬─────────────────────────┬──────────────────────────────┐
-│  New search      │  Progress               │  What is happening           │
-│  hostels         │  ● getting details…     │  Results list found…         │
-│  Lahore          │                         │  +12 new places (164 total)  │
-│  Johar Town      │      164 of 164         │  ✓ Lahore Hostel | 0313…     │
-│  Expect ~150     │  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ 100%   │  ✓ Boys Hostel   | 0317…     │
-│  [ Find places ] │  Started 5:41 PM ·      │  short 5s rest…              │
-│                  │  Working time 2 min     │  Hunt complete: 164 saved    │
-├──────────────────┴─────────────────────────┴──────────────────────────────┤
-│  Your searches            ⬇ Download selected (2)     ⬇ Download everything│
-│  #16  hostels — Township   finished   193 found   193 saved   3 min   ⬇ 🗑 │
-│  #13  hostels — Johar Town finished   164 found   164 saved   4 min   ⬇ 🗑 │
-└───────────────────────────────────────────────────────────────────────────┘
-```
 
 ## Features
 
-- **One click** — discovery and detail collection run start to finish on their own
-- **Queue** — start several areas; they run one at a time, safely
-- **Never loses data** — everything saves as it is collected; pause, close the
-  window or lose power anytime, and Resume continues from the exact point —
-  even in the middle of a deep search
-- **Instant re-runs** — places already collected are recognised and copied from the
-  database instead of being fetched again
-- **Duplicate marking** — repeats are flagged, never deleted, and you choose at export
-- **Export filters** — area, sub-area, rating, reviews, phone-only, boys/girls, dates
-- **Plain-language interface** — built for non-technical users, with live progress,
-  a colour-coded activity log, and hover explanations on every option and status
-- **Handles Google's human check** — pauses, alerts, one click to clear, then carries on
+- **One click**: discovery and detail collection run start to finish autonomously
+- **Queue**: launch several areas; they run one at a time safely
+- **Never loses data**: everything saves live as it is collected; pause, close the
+  window or lose power anytime, and Resume continues from the exact point
+- **Instant re-runs**: places already collected are recognised and copied from the
+  database instantly instead of being re-scraped
+- **Duplicate marking**: repeats are flagged with explicit reasons (same phone, same name), never deleted, and you choose filter options at export
+- **Export filters**: area, sub-area, rating, reviews, phone-only, category filter, dates
+- **Plain-language interface**: built for non-technical users, with live progress,
+  a color-coded activity log, and hover explanations on every option and status
+- **Handles Google verification**: pauses, alerts, one click to clear, then carries on automatically
 
 ## Install (Windows)
 
 1. Install [Node.js](https://nodejs.org) **24 or newer** (LTS installer, all defaults).
 2. Download or clone this repository.
-3. Run `hostel-hunter/setup.bat` once — it installs the packages and the browser engine.
-4. Double-click **`Start Hostel Finder.bat`**. The app opens in your browser.
+3. Run `client-hunt/setup.bat` once: it installs the dependencies and browser engine.
+4. Double-click **`Start Client Hunt.bat`**. The app opens in your browser.
 
 Full step-by-step instructions, including a fresh-laptop checklist and
 troubleshooting, are in **[SETUP.md](SETUP.md)**.
-The day-to-day user guide is in **[hostel-hunter/README.md](hostel-hunter/README.md)**.
+The user guide is in **[client-hunt/README.md](client-hunt/README.md)**.
 
-To stop it: just close the black window. The app shuts down cleanly — data,
+To stop it: just close the black window. The app shuts down cleanly: data,
 browser and port are all released, and a half-finished search resumes from the
 exact same point next time.
 
 ## Configuration
 
-All settings live in `hostel-hunter/.env` — copy `.env.example` to `.env` and edit.
+All settings live in `client-hunt/.env`: copy `.env.example` to `.env` and edit.
 Times are in seconds. The app runs fine without the file, using built-in defaults.
 
 ## How it is built
@@ -112,24 +80,20 @@ Times are in seconds. The app runs fine without the file, using built-in default
 | Part | Choice |
 |---|---|
 | Engine | Node.js + Playwright (headless Chromium) |
-| Storage | SQLite via Node's built-in `node:sqlite` — single source of truth |
+| Storage | SQLite via Node's built-in `node:sqlite`: single source of truth |
 | Excel/CSV | ExcelJS |
 | Interface | Plain `node:http` server + vanilla JS, no framework |
 
-Four dependencies total, no build step, no bundler.
+Zero complex build steps, lightweight local desktop architecture.
 
 ## Notes
 
-- **This is a local desktop-style app, not a cloud app.** It needs a long-running
-  process, a persistent disk, and an ordinary internet connection — serverless
-  hosts provide none of those, and Google treats datacenter addresses far more
-  harshly than a normal office connection.
-- It reads Google's public pages the way a person does, paced with delays and
-  rest periods. Keep the pacing sensible; the defaults have been measured against
-  real usage.
-- Google Maps does not publish email addresses, so that column is usually empty —
-  the same limitation the manual process has.
+- **This is a local desktop-style app, not a cloud app.** It runs on a persistent disk
+  and an ordinary internet connection.
+- It reads Google Maps paced with human-like delays and rest periods.
+- Google Maps does not publish private direct emails on map pins, so email is populated when publicly exposed.
 
 ## Licence
 
-Internal tool — © Web 7 Labs.
+MIT License. Open for customization for any sales & marketing department.
+
